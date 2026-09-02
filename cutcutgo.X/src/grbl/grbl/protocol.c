@@ -278,6 +278,13 @@ void protocol_handler(void)
         }
         break;
 
+        case STATE_HOMING:
+        case STATE_WARMUP:
+        {
+            /* LED handled by led_update_from_state() - do nothing here. */
+        }
+        break;
+
         default:
         case STATE_IDLE:
         {
