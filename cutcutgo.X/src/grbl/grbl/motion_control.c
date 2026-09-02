@@ -419,21 +419,20 @@ void mc_head_center(void)
     st_prep_buffer(); // Prep and fill segment buffer from newly planned block.
     st_wake_up(); // Initiate motion
 
-    protocol_execute_realtime(); // Check for reset and set system abort.
-    //if (sys.abort) { return; } // Did not complete. Alarm state set by mc_alarm.
-
-    // Homing cycle complete! Setup system for normal operation.
-    // -------------------------------------------------------------------------------------
+    // Wait for the centering move to complete. The stepper timer ISR steps the motor one
+    // Bresenham step at a time and the driver briefly reports HAL_MOTOR_IDLE between steps,
+    // so polling hal_motor_get_state() exits prematurely. Wait on EXEC_CYCLE_STOP instead:
+    // st_plan_next_move() sets it only after the whole block has been stepped out, the same
+    // completion signal limits_go_home() uses.
+    while (!(sys_rt_exec_state & EXEC_CYCLE_STOP)) {
+      st_prep_buffer();
+      if (sys_rt_exec_state & EXEC_RESET) { return; }
+    }
+    system_clear_exec_state_flag(EXEC_CYCLE_STOP);
 
     // Sync gcode parser and planner positions to homed position.
     gc_sync_position();
     plan_sync_position();
-    
-    // Wait for the tool head to move to the target position
-    while (hal_motor_get_state(&HAL_MOTOR_X) != HAL_MOTOR_IDLE) {
-      protocol_execute_realtime();
-      if (sys.abort) { return; }
-    }
   }
 }
 
