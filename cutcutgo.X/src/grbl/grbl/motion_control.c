@@ -414,21 +414,29 @@ void mc_head_center(void)
     target[X_AXIS] = DEFAULT_HEAD_CENTER;
     target[Y_AXIS] = 0.0;
     target[Z_AXIS] = 0.0;
-    plan_buffer_line(target, pl_data);
+    // Bail if no motion is needed (already centered); a zero-length block would never
+    // set EXEC_CYCLE_STOP and the wait below would hang.
+    if (plan_buffer_line(target, pl_data) == PLAN_EMPTY_BLOCK) { return; }
     sys.step_control = STEP_CONTROL_EXECUTE_SYS_MOTION; // Set to execute homing motion and clear existing flags.
+    system_clear_exec_state_flag(EXEC_CYCLE_STOP); // Clear any residual flag before starting.
     st_prep_buffer(); // Prep and fill segment buffer from newly planned block.
     st_wake_up(); // Initiate motion
 
     // Wait for the centering move to complete. The stepper timer ISR steps the motor one
     // Bresenham step at a time and the driver briefly reports HAL_MOTOR_IDLE between steps,
     // so polling hal_motor_get_state() exits prematurely. Wait on EXEC_CYCLE_STOP instead:
-    // st_plan_next_move() sets it only after the whole block has been stepped out, the same
-    // completion signal limits_go_home() uses.
+    // st_plan_next_move() sets it only after the whole block has been stepped out.
+    // NOTE: do NOT call st_prep_buffer() in this loop. plan_get_system_motion_block() has no
+    // empty-buffer check, so once the block is consumed it would reload a stale block and
+    // restart the move, making the motor run forever.
     while (!(sys_rt_exec_state & EXEC_CYCLE_STOP)) {
-      st_prep_buffer();
       if (sys_rt_exec_state & EXEC_RESET) { return; }
     }
     system_clear_exec_state_flag(EXEC_CYCLE_STOP);
+
+    // The block is consumed, no more steps will be issued, so the motor will not flap
+    // anymore: wait until it physically finishes the last step.
+    while (hal_motor_get_state(&HAL_MOTOR_X) != HAL_MOTOR_IDLE);
 
     // Sync gcode parser and planner positions to homed position.
     gc_sync_position();
