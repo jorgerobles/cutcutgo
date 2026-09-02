@@ -25,5 +25,5 @@
 ## 4. Verification and docs
 
 - [x] 4.1 Full host-side simulator suite green (drivers + reference cycle + fallbacks) before any machine run
-- [ ] 4.2 Build firmware with Docker toolchain, -Werror clean; commit `FIRMWARE_<hash>.uf2` per repo convention
+- [x] 4.2 Build firmware with Docker toolchain, -Werror clean; commit `FIRMWARE_<hash>.uf2` per repo convention
 - [ ] 4.3 Verify standard GRBL 1.1 responses unchanged (regression check) and update `docs/` hardware note with final validated detector capabilities
