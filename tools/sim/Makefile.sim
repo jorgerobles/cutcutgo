@@ -1,0 +1,83 @@
+# Makefile.sim — host build of the cutcutgo simulator test suite (gcc).
+#
+# Compile-the-real-code: the firmware sources listed below are compiled
+# UNMODIFIED on the host. Never add simulator-variant #ifdefs to firmware
+# sources; extend the seams (nvm_flash.h backend, nvm_machine_idle guard)
+# instead. Explicit source lists only — NEVER `find cutcutgo.X/src`, and the
+# target-only SFR backend nvm_flash.c must never appear here.
+#
+# Unity vendored from ThrowTheSwitch/Unity master, pinned at commit
+# 2b67b99a4a87db87ff8c28a3b7e405c3e56d65f0 (v2.7.2).
+#
+# Include flags: -Icutcutgo.X/src lets firmware sources and tests use
+# repo-style includes ("hal/nvm/nvm.h", "grbl/grbl/eeprom.h") on the host.
+# Do NOT add the grbl header dir itself to the include path: grbl/limits.h
+# would shadow the standard <limits.h> (gcc's internal limits.h include_next
+# walks every -I dir) and break unity_internals.h.
+#
+# Usage (repo root — e.g. inside the cutcutgo-builder container at /work):
+#   make -f tools/sim/Makefile.sim test     # build + run the test suite
+#   make -f tools/sim/Makefile.sim clean
+
+CC        ?= gcc
+CFLAGS    := -Wall -Werror -std=c11 \
+             -Icutcutgo.X/src \
+             -Itools/sim/plant \
+             -Itools/sim/harness \
+             -Itools/sim/tests \
+             -Itools/sim/unity
+BUILD_DIR := tools/sim/build
+BIN       := $(BUILD_DIR)/test_sim
+
+# REAL firmware sources (explicit list; keep in sync with the seams).
+# Head-sensors port: nvm/eeprom land later with the calibration change;
+# add firmware .c files here as they gain host-testable seams.
+SIM_FW_SRCS  := cutcutgo.X/src/grbl/grbl/blade_ref.c
+
+# Plant models (host-only physics, tools/sim/plant): DC motor model,
+# quadrature encoder generator, head-sensor models. The plant NEVER
+# contains firmware algorithms (compile-the-real-code boundary).
+SIM_PLANT_SRCS := tools/sim/plant/dc_motor.c \
+                  tools/sim/plant/quadrature.c \
+                  tools/sim/plant/sensors_sim.c
+
+# Harness (host-only, tools/sim/harness): NVM machine-idle guard state and
+# the deterministic 1 ms tick loop (future hook point for phases 2-3
+# motion/stall/homing algorithms).
+SIM_HARNESS_SRCS := tools/sim/harness/sim_state.c \
+                    tools/sim/harness/sim_tick.c
+
+# Sim-only sources: runner, registry, vendored Unity.
+SIM_SIM_SRCS := tools/sim/main.c \
+                tools/sim/tests/test_registry.c \
+                tools/sim/unity/unity.c
+
+# Test suites (later plans append their files here).
+SIM_TESTS    := tools/sim/tests/test_plant.c \
+                tools/sim/tests/test_motion_smoke.c \
+                tools/sim/tests/test_sensors.c \
+                tools/sim/tests/test_blade_ref.c
+
+SIM_ALL_SRCS := $(SIM_FW_SRCS) $(SIM_PLANT_SRCS) $(SIM_HARNESS_SRCS) \
+                $(SIM_SIM_SRCS) $(SIM_TESTS)
+OBJECTS      := $(patsubst %.c,$(BUILD_DIR)/%.o,$(SIM_ALL_SRCS))
+DEPS         := $(OBJECTS:.o=.d)
+
+.PHONY: test test-sim clean
+
+test: $(BIN)
+	./$(BIN)
+
+test-sim: test
+
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<
+
+$(BIN): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS)
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+-include $(DEPS)
