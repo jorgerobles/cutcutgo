@@ -22,6 +22,7 @@
 #include "grbl.h"
 #include "reset.h"
 #include "hal/motor.h"
+#include "hal/led.h"
 #include "print.h"
 
 // Define line flags. Includes comment type tracking and line overflow detection.
@@ -342,6 +343,19 @@ void protocol_execute_realtime()
   if (sys.suspend) { protocol_exec_rt_suspend(); }
 }
 
+
+// Update power LED based on system state:
+// - HOMING/WARMUP: blink white (machine is working)
+// - IDLE/ALARM: solid white (machine is ready or waiting)
+void led_update_from_state(void)
+{
+    if (sys.state == STATE_HOMING || sys.state == STATE_WARMUP) {
+        led_blink_mode(LED_POWER_WHITE);
+    } else {
+        led_normal_mode(LED_POWER_WHITE);
+        led_set(LED_POWER_WHITE);
+    }
+}
 
 // Executes run-time commands, when required. This function primarily operates as Grbl's state
 // machine and controls the various real-time features Grbl has to offer.
@@ -898,6 +912,9 @@ void protocol_exec_rt_system()
   if (sys.state & (STATE_CYCLE | STATE_HOLD | STATE_SAFETY_DOOR | STATE_HOMING | STATE_SLEEP| STATE_JOG)) {
     st_prep_buffer();
   }
+
+  // Update power LED based on system state
+  led_update_from_state();
 
 }
 
