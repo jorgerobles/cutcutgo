@@ -31,8 +31,15 @@ motores energizados bloqueados, y posición/calibración persistida con desvío 
 ### Build Status
 
 - **Verificado**: upstream v1.0 + Docker toolchain = firmware funcional en máquina
-- **Firmware original**: `FIRMWARE_ORIGINAL.uf2`
-- **Firmware reconstruido**: `FIRMWARE_FORK.uf2` (idéntico a upstream CI latest)
+- **Firmware original**: `FIRMWARE_972f570.uf2` (upstream v1.0 release)
+- **Firmware reconstruido**: `FIRMWARE_f0faf2f.uf2` (v1.0 sources + XC32 v4.35)
+
+### Build Artifacts Convention
+
+- **Todos los firmware compilados se commitean** con el hash del commit en el nombre
+- Formato: `FIRMWARE_<commit-hash>.uf2` (ej: `FIRMWARE_f0faf2f.uf2`)
+- No importa el peso del repositorio — trazabilidad completa
+- También: `.hex`, `.bin`, `.elf` si son necesarios para debug
 
 <!-- GSD:project-end -->
 
