@@ -100,6 +100,76 @@ static void print_hex8(uint8_t v)
     printString(buf);
 }
 
+static void i2c_write_byte(uint8_t byte)
+{
+    int bit;
+    for (bit = 7; bit >= 0; bit--)
+        i2c_write_bit((byte >> bit) & 1);
+}
+
+static uint8_t i2c_read_byte(void)
+{
+    uint8_t byte = 0;
+    int bit;
+    sda_in();
+    for (bit = 7; bit >= 0; bit--) {
+        scl_hi();
+        dly();
+        if (sda_read())
+            byte |= (1 << bit);
+        scl_lo();
+        dly();
+    }
+    return byte;
+}
+
+static void i2c_write_ack(void)
+{
+    sda_out(0);
+    dly();
+    scl_hi();
+    dly();
+    scl_lo();
+}
+
+static void dbg_i2c_read(uint8_t addr, uint8_t reg)
+{
+    printString("[DBG] i2c read addr=");
+    print_hex8(addr);
+    printString(" reg=");
+    print_hex8(reg);
+    printString("\r\n");
+
+    i2c_start();
+    i2c_write_byte((addr << 1) & 0xFE);
+    if (!i2c_read_ack()) {
+        printString("[DBG] i2c no ack (write)\r\n");
+        i2c_stop();
+        return;
+    }
+    i2c_write_byte(reg);
+    if (!i2c_read_ack()) {
+        printString("[DBG] i2c no ack (reg)\r\n");
+        i2c_stop();
+        return;
+    }
+    i2c_start();
+    i2c_write_byte((addr << 1) | 0x01);
+    if (!i2c_read_ack()) {
+        printString("[DBG] i2c no ack (read)\r\n");
+        i2c_stop();
+        return;
+    }
+    {
+        uint8_t val = i2c_read_byte();
+        i2c_write_ack();
+        i2c_stop();
+        printString("[DBG] i2c val=");
+        print_hex8(val);
+        printString("\r\n");
+    }
+}
+
 static void dbg_i2c_scan(void)
 {
     uint8_t addr;
@@ -243,6 +313,25 @@ uint8_t debug_probe_execute(const char *line)
             }
         }
         dbg_sample(n);
+        return STATUS_OK;
+    }
+    if (strncmp(line, "$DBGI2CR", 8) == 0 && line[8] == '=') {
+        uint8_t addr = 0;
+        uint8_t reg = 0;
+        const char *s = line + 9;
+
+        while (*s >= '0' && *s <= '9') {
+            addr = addr * 10 + (uint8_t)(*s - '0');
+            s++;
+        }
+        if (*s == ',') {
+            s++;
+            while (*s >= '0' && *s <= '9') {
+                reg = reg * 10 + (uint8_t)(*s - '0');
+                s++;
+            }
+        }
+        dbg_i2c_read(addr, reg);
         return STATUS_OK;
     }
     return STATUS_INVALID_STATEMENT;
