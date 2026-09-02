@@ -547,6 +547,9 @@ void protocol_exec_rt_system()
           sys.suspend &= ~(SUSPEND_JOG_CANCEL);
           sys.suspend |= SUSPEND_HOLD_COMPLETE;
           sys.state = STATE_SAFETY_DOOR;
+        } else if (sys.state == STATE_WARMUP) {
+          // Don't transition to IDLE during warmup - let warmup code handle it
+          sys.suspend = SUSPEND_DISABLE;
         } else if (sys.state != STATE_MAT_LOAD_UNLOAD) {
           //printString("[protocol_rt_system(): sys.state=STATE_IDLE]\r\n");
           sys.suspend = SUSPEND_DISABLE;
