@@ -1,0 +1,120 @@
+# Makefile.firmware — standalone build of cutcutgo firmware (no MPLAB X required).
+#
+# Mirrors the flags of the MPLAB-generated nbproject/Makefile-*.mk production rules:
+#   compile: xc32-gcc -g -x c -c -mprocessor=32MX470F512L -ffunction-sections -fno-common
+#            -Icutcutgo.X/src -Icutcutgo.X/src/config/cutcutgo -Werror -Wall <extra warnings> -mdfp=$(DFP_DIR)
+#   link:    xc32-gcc -mprocessor=32MX470F512L -Wl,--script=<conf ld>,--defsym=_min_heap_size=512,
+#            --gc-sections,--no-code-in-dinit,--no-dinit-in-serial-mem,-Map=...
+#   hex:     xc32-bin2hex
+#
+# Usage (inside the cutcutgo-builder image, or any host with XC32):
+#   make -f tools/Makefile.firmware CONF=cutcutgo          # standalone app
+#   make -f tools/Makefile.firmware CONF=cutcutgo_bl       # bootloader-layout app
+#   make -f tools/Makefile.firmware all                    # both + UF2
+#   make -f tools/Makefile.firmware TOLERANT=1 ...         # drop -Werror
+
+XC32_DIR  ?= /opt/microchip/xc32/v4.35
+DFP_DIR   ?= /opt/packs/Microchip/PIC32MX_DFP/1.5.259
+CC        := $(XC32_DIR)/bin/xc32-gcc
+BIN2HEX   := $(XC32_DIR)/bin/xc32-bin2hex
+OBJCOPY   := $(XC32_DIR)/bin/xc32-objcopy
+PYTHON    ?= python3
+UF2CONV ?= utils/uf2conv.py
+
+CONF      ?= cutcutgo
+BUILD_DIR := build/$(CONF)/production
+DIST_DIR  := dist/$(CONF)/production
+ELF       := $(DIST_DIR)/cutcutgo.X.production.elf
+HEX       := $(DIST_DIR)/cutcutgo.X.production.hex
+MAP       := $(DIST_DIR)/cutcutgo.X.production.map
+BIN       := $(DIST_DIR)/cutcutgo.X.production.bin
+UF2       := $(DIST_DIR)/Cutcutgo_maker1_bootloader_app.uf2
+
+# Bootloader app UF2 params (family id 'MAKER', base 0x1d010000) — same as CI release.
+UF2_FAMILY := 0x4d414b52
+UF2_BASE   := 0x1d010000
+
+# Bootloader app UF2 covers exactly the application range 0x1D010000..0x1D080000
+# (0x70000 bytes = 448 KB). The objcopy binary of the _bl hex spans all the way
+# to the boot-flash config words (~0x1FC02FF0), so without truncation the bin —
+# and thus the UF2 — is ~92 MB of mostly zero padding.
+#
+# Safety: the bootloader only writes UF2 blocks whose targetAddr falls inside
+# 0x1D010000..0x1D080000 (cutcutgo_bl src/fat32.c:636) — any block outside the
+# app range is discarded. Those tail bytes (incl. config words) were never
+# flashed, so truncating the bin before uf2conv changes the artifact size, not
+# what ends up on the chip.
+# 0x70000 = 458752 (decimal: coreutils truncate rejects the 0x prefix).
+# UF2 span now computed dynamically by tools/uf2_slim.py (code end, 4KB-aligned, below NVM page)
+
+SOURCES := $(shell find cutcutgo.X/src -name '*.c' | sort)
+OBJECTS := $(patsubst cutcutgo.X/src/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
+
+CPUFLAGS := -mprocessor=32MX470F512L
+WARNINGS := -Werror -Wall -Wundef -Wshadow -Wpointer-arith -Wbad-function-cast \
+            -Wwrite-strings -Waggregate-return -Wstrict-prototypes \
+            -Wno-deprecated-declarations -Wredundant-decls -Wnested-externs \
+            -Wlong-long -Wunreachable-code -Wmissing-noreturn
+ifeq ($(TOLERANT),1)
+  WARNINGS := $(subst -Werror,,$(WARNINGS))
+endif
+CFLAGS   := -g -x c -c $(CPUFLAGS) -ffunction-sections -fno-common \
+            -Icutcutgo.X/src -Icutcutgo.X/src/config/cutcutgo $(WARNINGS) -mdfp="$(DFP_DIR)" \
+            -DXPRJ_cutcutgo=$(CONF)
+
+# Per-configuration linker script (standalone vs bootloader layout).
+ifeq ($(CONF),cutcutgo_bl)
+  LDSCRIPT := cutcutgo.X/src/config/cutcutgo/p32MX470F512H.bl.ld
+else
+  LDSCRIPT := cutcutgo.X/src/config/cutcutgo/p32MX470F512H.ld
+endif
+
+LDFLAGS := $(CPUFLAGS) \
+  -Wl,--script=$(LDSCRIPT),--defsym=_min_heap_size=512,--gc-sections,--no-code-in-dinit,--no-dinit-in-serial-mem,-Map=$(MAP),--memorysummary,$(DIST_DIR)/memoryfile.xml \
+  -mdfp="$(DFP_DIR)" -DXPRJ_cutcutgo=$(CONF)
+
+.PHONY: all build-one clean clean-all uf2 cutcutgo cutcutgo_bl test-sim
+
+all:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) CONF=cutcutgo build-one
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) CONF=cutcutgo_bl build-one
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) CONF=cutcutgo_bl uf2
+
+build-one: $(HEX)
+
+cutcutgo:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) CONF=cutcutgo build-one
+
+cutcutgo_bl:
+	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) CONF=cutcutgo_bl build-one
+
+$(BUILD_DIR)/%.o: cutcutgo.X/src/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -MMD -MP -o $@ $<
+
+$(ELF): $(OBJECTS) $(LDSCRIPT)
+	@mkdir -p $(DIST_DIR)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS)
+
+$(HEX): $(ELF)
+	$(BIN2HEX) $<
+
+$(BIN): $(HEX)
+	$(OBJCOPY) -I ihex -O binary $< $@
+
+uf2: $(BIN)
+	$(PYTHON) tools/uf2_slim.py $(XC32_DIR)/bin/xc32-objdump $(ELF) $(BIN) $(UF2CONV) $(UF2) $(UF2_BASE)
+	@echo "UF2 written: $(UF2)"
+
+clean:
+	rm -rf build/$(CONF) dist/$(CONF)
+
+clean-all:
+	rm -rf build dist
+
+# Host simulator test suite (passthrough: the sim Makefile lives at the repo
+# root, outside cutcutgo.X, so build from there).
+test-sim:
+	$(MAKE) -C .. -f tools/sim/Makefile.sim test
+
+-include $(OBJECTS:.o=.d)
