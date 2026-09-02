@@ -430,7 +430,10 @@ void mc_head_center(void)
     plan_sync_position();
     
     // Wait for the tool head to move to the target position
-    while (hal_motor_get_state(&HAL_MOTOR_X) != HAL_MOTOR_IDLE);
+    while (hal_motor_get_state(&HAL_MOTOR_X) != HAL_MOTOR_IDLE) {
+      protocol_execute_realtime();
+      if (sys.abort) { return; }
+    }
   }
 }
 
