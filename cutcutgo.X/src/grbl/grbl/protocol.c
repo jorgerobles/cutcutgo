@@ -21,6 +21,7 @@
 
 #include "grbl.h"
 #include "reset.h"
+#include "blade_home.h"
 #include "hal/motor.h"
 #include "hal/led.h"
 #include "print.h"
@@ -380,6 +381,8 @@ void led_update_from_state(void)
 void protocol_exec_rt_system()
 {
   uint32_t rt_exec; // Temp variable to avoid calling volatile multiple times.
+
+  blade_home_poll();
   rt_exec = sys_rt_exec_alarm; // Copy volatile sys_rt_exec_alarm.
 
   if (rt_exec) { // Enter only if any bit flag is true

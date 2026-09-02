@@ -18,8 +18,12 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <string.h>
+
 #include "grbl.h"
 #include "config/cutcutgo/peripheral/evic/plib_evic.h"
+#include "hal/debug_probe.h"
+#include "blade_home.h"
 
 
 void system_init()
@@ -132,6 +136,17 @@ uint8_t system_execute_line(char *line)
   uint8_t char_counter = 1;
   uint8_t helper_var = 0; // Helper variable
   float parameter, value;
+  if ( line[char_counter] == 'D' && strncmp(line, "$DBG", 4) == 0 ) {
+    if ( sys.state != STATE_IDLE ) { return(STATUS_IDLE_ERROR); }
+    return( debug_probe_execute(line) );
+  }
+  if ( strncmp(line, "$HB", 3) == 0 && line[3] == 0 ) {
+    return( blade_home_run() );
+  }
+  if ( strncmp(line, "$BQ", 3) == 0 && line[3] == 0 ) {
+    blade_home_report();
+    return( STATUS_OK );
+  }
   switch( line[char_counter] ) {
     case 0 : report_grbl_help(); break;
     case 'J' : // Jogging
@@ -202,7 +217,10 @@ uint8_t system_execute_line(char *line)
           if (!sys.abort) {  // Execute startup scripts after successful homing.
             sys.state = STATE_IDLE; // Set to IDLE when complete.
             st_go_idle(); // Set steppers to the settings idle state before returning.
-            if (line[2] == 0) { system_execute_startup(line); }
+            if (line[2] == 0) {
+              blade_home_after_homing();
+              system_execute_startup(line);
+            }
           }
           break;
         case 'S' : // Puts Grbl to sleep [IDLE/ALARM]
