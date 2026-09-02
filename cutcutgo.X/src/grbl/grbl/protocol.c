@@ -627,7 +627,7 @@ void protocol_exec_rt_system()
                   mc_head_center();
                   
                   /* System is ready ! */
-                  sys.state = STATE_IDLE;
+                  sys.state = STATE_IDLE;  /* After mc_head_center - keeps LED blinking during warmup */
               }
               else
               {
@@ -691,7 +691,7 @@ void protocol_exec_rt_system()
                 mc_head_center();
                 
                 /* System is ready ! */
-                sys.state = STATE_IDLE;
+                sys.state = STATE_IDLE;  /* After mc_head_center - keeps LED blinking during warmup */
             }
             else
             {

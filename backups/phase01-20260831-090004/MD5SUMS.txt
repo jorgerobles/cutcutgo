@@ -1,0 +1,6 @@
+facb062813e25bde6ab40f7220a2a969  backups/phase01-20260831-090004/cutcutgo-bl-app.elf
+46582b6b49b0213904e7e1d254f39e9a  backups/phase01-20260831-090004/cutcutgo-bl-app.hex
+1ca4f1c9756d04593ad7dc530ce66ba5  backups/phase01-20260831-090004/Cutcutgo_maker1_bootloader_app.uf2
+0b68592554ba2844b093f610507caaf2  backups/phase01-20260831-090004/cutcutgo-standalone.elf
+41a6bd4a92c3411dc294bdbff81b5db8  backups/phase01-20260831-090004/cutcutgo-standalone.hex
+05242ed1098c9406a1551a9242d34753  backups/phase01-20260831-090004/GIT-COMMIT.txt
