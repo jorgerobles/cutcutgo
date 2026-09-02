@@ -293,6 +293,25 @@ static void dbg_sample(uint32_t n)
 
 uint8_t debug_probe_execute(const char *line)
 {
+    if (strncmp(line, "$DBGI2CR", 8) == 0 && line[8] == '=') {
+        uint8_t addr = 0;
+        uint8_t reg = 0;
+        const char *s = line + 9;
+
+        while (*s >= '0' && *s <= '9') {
+            addr = addr * 10 + (uint8_t)(*s - '0');
+            s++;
+        }
+        if (*s == ',') {
+            s++;
+            while (*s >= '0' && *s <= '9') {
+                reg = reg * 10 + (uint8_t)(*s - '0');
+                s++;
+            }
+        }
+        dbg_i2c_read(addr, reg);
+        return STATUS_OK;
+    }
     if (strncmp(line, "$DBGI2C", 7) == 0) {
         dbg_i2c_scan();
         return STATUS_OK;
@@ -313,25 +332,6 @@ uint8_t debug_probe_execute(const char *line)
             }
         }
         dbg_sample(n);
-        return STATUS_OK;
-    }
-    if (strncmp(line, "$DBGI2CR", 8) == 0 && line[8] == '=') {
-        uint8_t addr = 0;
-        uint8_t reg = 0;
-        const char *s = line + 9;
-
-        while (*s >= '0' && *s <= '9') {
-            addr = addr * 10 + (uint8_t)(*s - '0');
-            s++;
-        }
-        if (*s == ',') {
-            s++;
-            while (*s >= '0' && *s <= '9') {
-                reg = reg * 10 + (uint8_t)(*s - '0');
-                s++;
-            }
-        }
-        dbg_i2c_read(addr, reg);
         return STATUS_OK;
     }
     return STATUS_INVALID_STATEMENT;
