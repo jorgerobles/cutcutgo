@@ -304,18 +304,28 @@ void protocol_handler(void)
 }
 
 
-// Block until all buffered steps are executed or in a cycle state. Works with feed hold
-// during a synchronize call, if it should happen. Also, waits for clean cycle end.
+// Block until all buffered motion has been executed and the motors have come to rest.
+// Handles both normal queued g-code blocks (the planner buffer drains and the cycle ends)
+// and special system motions such as head-centering, whose completion is signalled by
+// protocol_exec_rt_system() clearing STEP_CONTROL_EXECUTE_SYS_MOTION. Also waits for a
+// clean cycle end.
 void protocol_buffer_synchronize()
 {
   // If system is queued, ensure cycle resumes if the auto start flag is present.
   protocol_auto_cycle_start();
-#if 0
   do {
     protocol_execute_realtime();   // Check and execute run-time commands
     if (sys.abort) { return; } // Check for system abort
-  } while (plan_get_current_block() || (sys.state == STATE_CYCLE));
-#endif
+  } while (plan_get_current_block() || (sys.state == STATE_CYCLE) ||
+           (sys.step_control & STEP_CONTROL_EXECUTE_SYS_MOTION));
+  // No further steps can be issued now: wait until every motor has finished its last
+  // commanded move so the axes are physically settled before the caller continues.
+  while ((hal_motor_get_state(&HAL_MOTOR_X) == HAL_MOTOR_DRIVEN) ||
+         (hal_motor_get_state(&HAL_MOTOR_Y) == HAL_MOTOR_DRIVEN) ||
+         (hal_motor_get_state(&HAL_MOTOR_TOOL1) == HAL_MOTOR_DRIVEN) ||
+         (hal_motor_get_state(&HAL_MOTOR_TOOL2) == HAL_MOTOR_DRIVEN)) {
+    if (sys_rt_exec_state & EXEC_RESET) { return; } // Bail out on a pending reset.
+  }
 }
 
 
@@ -541,6 +551,9 @@ void protocol_exec_rt_system()
         bit_false(sys.step_control,(STEP_CONTROL_EXECUTE_HOLD | STEP_CONTROL_EXECUTE_SYS_MOTION));
       } else {
         // Motion complete. Includes CYCLE/JOG/HOMING states and jog cancel/motion cancel/soft limit events.
+        // A system motion (e.g. head-centering) just finished: drop its execution flag so that
+        // protocol_buffer_synchronize() resumes. No-op when no system motion is active.
+        bit_false(sys.step_control, STEP_CONTROL_EXECUTE_SYS_MOTION);
         // NOTE: Motion and jog cancel both immediately return to idle after the hold completes.
         if (sys.suspend & SUSPEND_JOG_CANCEL) {   // For jog cancel, flush buffers and sync positions.
           //printString("[protocol_rt_system(): SUSPEND_JOG_CANCEL]\r\n");
