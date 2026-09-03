@@ -272,6 +272,9 @@ static void dbg_rgb(uint8_t addr)
     uint16_t g, r, b;
 
     i2c_recover();
+    dbg_i2c_write(addr, 0x01, 0x05);
+    delay_ms(150);
+    delay_ms(150);
     if (!i2c_set_pointer(addr, 0x01)) {
         printString("[DBG] rgb: ptr fail\r\n");
         return;
