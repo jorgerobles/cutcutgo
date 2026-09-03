@@ -1,7 +1,33 @@
 # Head detectors: mark detector & blade detector — inspection record
 
-Status: **schematic analysis done; on-device probing pending** (see open items).
-Source: `schematics/CricutMaker-schematics.pdf` (rev 2, virtualabs reverse).
+Status: **identified on machine — ISL29125 RGB light sensor** (probing continues).
+Source: `schematics/CricutMaker-schematics.pdf` (rev 2, virtualabs reverse) + on-machine probing.
+
+## Identified: ISL29125 RGB light sensor @ I2C 0x44
+
+On-machine evidence (firmware `$DBG` probing, 2026-09-03):
+- I2C scan on J500 `SDA_1`/`SCL_1` (MCU RA3/RA2): single responder at **0x44**.
+- Register 0x00 (device ID) reads **0x7D** — the ISL29125 default device ID.
+- Conclusion: the head PCB carries an **ISL29125 RGB digital light sensor**
+  (ADDR low → 0x44). Same reflectivity signal serves both roles:
+  **mark detection** (paper Print-Then-Cut marks) and **tool/blade detection**
+  (QuickSwap gear flash/notches scanned during homing), per Cricut behavior and
+  community reverse-engineering.
+
+ISL29125 register map (for driver implementation):
+| Reg | Name        | Notes                                      |
+|-----|-------------|--------------------------------------------|
+|0x00 | Device ID   | 0x7D                                       |
+|0x01 | CFG1        | power-down after reset; write 0x05 = RGB mode, 16-bit, 375 lux (0x0D = 10000 lux range) |
+|0x02 | CFG2        | IR compensation / filtering                |
+|0x03 | CFG3        | RGB conversion-done flags, IRQ             |
+|0x04/05 | G low/high | 16-bit                                  |
+|0x06/07 | R low/high | 16-bit                                  |
+|0x08/09 | B low/high | 16-bit                                  |
+
+GPIO probing results: RD7/RD8/RD9 (and RA2/RA3 as GPIO) held high, **zero
+transitions** during 2 s sampling windows with actuation → no discrete detector
+lines on probed pins; all detection goes through the I2C sensor.
 
 ## Main-PCB facts (J500 head ribbon)
 
@@ -33,16 +59,19 @@ X/Y encoders (RG0/1, RG6/7) go to the X/Y motor JST connectors, not J500.
 ## Probing plan (debug firmware, `$DBG` commands)
 
 1. `$DBGI2C` — bit-banged open-drain I2C scan 0x08-0x77 on RA2(SCL)/RA3(SDA); print responders.
-2. `$DBGPWR` — sample POWER_STATE_OUT line (both directions/pull configs); print level.
-3. `$DBGSAMP <n>` — sample candidate pins (RA2/RA3 as GPIO, POWER_STATE_OUT, RD7/RD8/RD9)
-   n times at 1 ms while the operator actuates blade / moves a mark; print min/max/transitions
-   to derive polarity, signal type (digital/analog), debounce needs.
+2. `$DBGPWR` — sample candidate lines (RA2/RA3, RD7/RD8/RD9): level + drive test.
+3. `$DBGSAMP <n>` — sample candidate pins n×1 ms while actuating blade / moving mark.
+4. `$DBGI2CR=addr,reg` — read one register (decimal args).
+5. `$DBGI2CW=addr,reg,val` — write one register (decimal args).
+6. `$DBGRGB[=addr]` — configure ISL29125 (RGB/16-bit/375 lux) and print R/G/B.
 
 ## Open items (resolve on machine, then update this note)
 
-- [ ] I2C responder addresses and which is mark vs blade detector (if I2C at all).
-- [ ] Per detector: protocol, signal type, polarity, max sampling rate.
-- [ ] POWER_STATE_OUT direction/semantics; does it participate in blade detection?
+- [x] I2C responder address: 0x44, ISL29125 (both detectors behind it).
+- [ ] RGB reflectance over white paper vs black mark (which channel + threshold separates marks).
+- [ ] Sensor response while head scans blade/gear during homing (tool detection signature).
+- [ ] CFG2 IR-compensation value Cricut uses (may matter for mark contrast).
+- [ ] Max usable sampling rate (conversion ~100 ms at 16-bit/375 lux; 12-bit/10 kHz modes faster).
 - [ ] Board variant (X1 vs X2) of the unit under test.
 
 Driver constants in `hal/sensors*` MUST equal the values recorded here once probing completes.

@@ -132,14 +132,52 @@ static void i2c_write_ack(void)
     scl_lo();
 }
 
+static uint8_t i2c_read_reg(uint8_t addr, uint8_t reg, uint8_t *val)
+{
+    i2c_start();
+    i2c_write_byte((addr << 1) & 0xFE);
+    if (!i2c_read_ack()) {
+        i2c_stop();
+        return 0;
+    }
+    i2c_write_byte(reg);
+    if (!i2c_read_ack()) {
+        i2c_stop();
+        return 0;
+    }
+    i2c_start();
+    i2c_write_byte((addr << 1) | 0x01);
+    if (!i2c_read_ack()) {
+        i2c_stop();
+        return 0;
+    }
+    *val = i2c_read_byte();
+    i2c_write_ack();
+    i2c_stop();
+    return 1;
+}
+
 static void dbg_i2c_read(uint8_t addr, uint8_t reg)
 {
+    uint8_t val;
+
     printString("[DBG] i2c read addr=");
     print_hex8(addr);
     printString(" reg=");
     print_hex8(reg);
     printString("\r\n");
 
+    if (!i2c_read_reg(addr, reg, &val)) {
+        printString("[DBG] i2c read fail\r\n");
+        return;
+    }
+    printString("[DBG] i2c val=");
+    print_hex8(val);
+    printString("\r\n");
+}
+
+static void dbg_i2c_write(uint8_t addr, uint8_t reg, uint8_t val)
+{
     i2c_start();
     i2c_write_byte((addr << 1) & 0xFE);
     if (!i2c_read_ack()) {
@@ -153,21 +191,43 @@ static void dbg_i2c_read(uint8_t addr, uint8_t reg)
         i2c_stop();
         return;
     }
-    i2c_start();
-    i2c_write_byte((addr << 1) | 0x01);
+    i2c_write_byte(val);
     if (!i2c_read_ack()) {
-        printString("[DBG] i2c no ack (read)\r\n");
+        printString("[DBG] i2c no ack (val)\r\n");
         i2c_stop();
         return;
     }
-    {
-        uint8_t val = i2c_read_byte();
-        i2c_write_ack();
-        i2c_stop();
-        printString("[DBG] i2c val=");
-        print_hex8(val);
-        printString("\r\n");
-    }
+    i2c_stop();
+    printString("[DBG] i2c write ok\r\n");
+}
+
+static void dbg_rgb(uint8_t addr)
+{
+    uint8_t lo, hi;
+    uint16_t g, r, b;
+
+    dbg_i2c_write(addr, 0x01, 0x05);
+    delay_ms(150);
+    if (!i2c_read_reg(addr, 0x04, &lo) || !i2c_read_reg(addr, 0x05, &hi))
+        goto fail;
+    g = ((uint16_t)hi << 8) | lo;
+    if (!i2c_read_reg(addr, 0x06, &lo) || !i2c_read_reg(addr, 0x07, &hi))
+        goto fail;
+    r = ((uint16_t)hi << 8) | lo;
+    if (!i2c_read_reg(addr, 0x08, &lo) || !i2c_read_reg(addr, 0x09, &hi))
+        goto fail;
+    b = ((uint16_t)hi << 8) | lo;
+
+    printString("[DBG] rgb g=");
+    printInteger((long)g);
+    printString(" r=");
+    printInteger((long)r);
+    printString(" b=");
+    printInteger((long)b);
+    printString("\r\n");
+    return;
+fail:
+    printString("[DBG] rgb read fail\r\n");
 }
 
 static void dbg_i2c_scan(void)
@@ -293,6 +353,48 @@ static void dbg_sample(uint32_t n)
 
 uint8_t debug_probe_execute(const char *line)
 {
+    if (strncmp(line, "$DBGI2CW", 8) == 0 && line[8] == '=') {
+        uint8_t addr = 0;
+        uint8_t reg = 0;
+        uint8_t val = 0;
+        const char *s = line + 9;
+
+        while (*s >= '0' && *s <= '9') {
+            addr = addr * 10 + (uint8_t)(*s - '0');
+            s++;
+        }
+        if (*s == ',') {
+            s++;
+            while (*s >= '0' && *s <= '9') {
+                reg = reg * 10 + (uint8_t)(*s - '0');
+                s++;
+            }
+        }
+        if (*s == ',') {
+            s++;
+            while (*s >= '0' && *s <= '9') {
+                val = val * 10 + (uint8_t)(*s - '0');
+                s++;
+            }
+        }
+        dbg_i2c_write(addr, reg, val);
+        return STATUS_OK;
+    }
+    if (strncmp(line, "$DBGRGB", 7) == 0) {
+        uint8_t addr = 68;
+
+        if (line[7] == '=') {
+            const char *s = line + 8;
+
+            addr = 0;
+            while (*s >= '0' && *s <= '9') {
+                addr = addr * 10 + (uint8_t)(*s - '0');
+                s++;
+            }
+        }
+        dbg_rgb(addr);
+        return STATUS_OK;
+    }
     if (strncmp(line, "$DBGI2CR", 8) == 0 && line[8] == '=') {
         uint8_t addr = 0;
         uint8_t reg = 0;
