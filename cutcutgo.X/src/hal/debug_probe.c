@@ -227,6 +227,19 @@ static void i2c_recover(void)
 #define ISL_REG_RED_L   0x0B
 #define ISL_REG_BLUE_L  0x0D
 
+static uint8_t dbg_i2c_write_verify(uint8_t addr, uint8_t reg, uint8_t val)
+{
+    uint8_t i, rb;
+
+    for (i = 0; i < 3; i++) {
+        dbg_i2c_write(addr, reg, val);
+        if (i2c_read_reg(addr, reg, &rb) && rb == val)
+            return 1;
+        delay_ms(10);
+    }
+    return 0;
+}
+
 static void dbg_rgb(uint8_t addr)
 {
     uint8_t id, cfg1, st, lo, hi;
@@ -243,8 +256,9 @@ static void dbg_rgb(uint8_t addr)
     printString("\r\n");
 
     dbg_i2c_write(addr, ISL_REG_ID, 0x46);
-    dbg_i2c_write(addr, ISL_REG_CFG1, 0x0D);
-    dbg_i2c_write(addr, ISL_REG_CFG2, 0x3F);
+    delay_ms(10);
+    dbg_i2c_write_verify(addr, ISL_REG_CFG1, 0x0D);
+    dbg_i2c_write_verify(addr, ISL_REG_CFG2, 0x3F);
 
     for (i = 0; i < 4; i++)
         delay_ms(100);
