@@ -507,3 +507,136 @@ uint8_t debug_probe_execute(const char *line)
     }
     return STATUS_INVALID_STATEMENT;
 }
+
+#ifdef SENSOR_BENCH
+
+#include "hal/timer.h"
+
+typedef enum {
+    BENCH_SCAN,
+    BENCH_ID,
+    BENCH_CFG,
+    BENCH_WAIT,
+    BENCH_READ
+} bench_state_t;
+
+static bench_state_t bench_state = BENCH_SCAN;
+static uint32_t bench_next_ms;
+static uint16_t g_prev, r_prev, b_prev;
+static uint8_t bench_have_prev;
+
+static uint8_t i2c_probe(uint8_t addr)
+{
+    uint8_t ack;
+
+    i2c_start();
+    i2c_write_byte((uint8_t)(addr << 1));
+    ack = i2c_read_ack();
+    i2c_stop();
+    return ack;
+}
+
+void debug_bench_task(void)
+{
+    uint32_t now = timer_get_ms();
+
+    if ((int32_t)(now - bench_next_ms) < 0)
+        return;
+    bench_next_ms = now + 200;
+
+    switch (bench_state) {
+    case BENCH_SCAN: {
+        uint8_t a;
+
+        printString("[B] bus:");
+        for (a = 0x03; a < 0x78; a++) {
+            if (i2c_probe(a)) {
+                printString(" 0x");
+                print_hex8(a);
+            }
+        }
+        printString("\r\n");
+        i2c_recover();
+        bench_state = BENCH_ID;
+        break;
+    }
+    case BENCH_ID: {
+        uint8_t id;
+
+        if (!i2c_read_reg(0x44, ISL_REG_ID, &id))
+            printString("[B] id fail\r\n");
+        else {
+            printString("[B] id=");
+            print_hex8(id);
+            printString("\r\n");
+        }
+        bench_state = BENCH_CFG;
+        break;
+    }
+    case BENCH_CFG: {
+        uint8_t ok = 1;
+
+        dbg_i2c_write(0x44, ISL_REG_ID, 0x46);
+        delay_ms(50);
+        if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG1, 0x0D))
+            ok = 0;
+        if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG2, 0x3F))
+            ok = 0;
+        printString(ok ? "[B] cfg ok\r\n" : "[B] cfg FAIL\r\n");
+        bench_state = BENCH_WAIT;
+        bench_next_ms = timer_get_ms() + 400;
+        break;
+    }
+    case BENCH_WAIT:
+        bench_state = BENCH_READ;
+        break;
+    case BENCH_READ: {
+        uint8_t cfg1, st, lo, hi;
+        uint16_t g, r, b;
+
+        if (!i2c_read_reg(0x44, ISL_REG_CFG1, &cfg1) ||
+            !i2c_read_reg(0x44, ISL_REG_STATUS, &st) ||
+            !i2c_read_reg(0x44, ISL_REG_GREEN_L, &lo) ||
+            !i2c_read_reg(0x44, ISL_REG_GREEN_L + 1, &hi))
+            goto read_fail;
+        g = (uint16_t)(((uint16_t)hi << 8) | lo);
+        if (!i2c_read_reg(0x44, ISL_REG_RED_L, &lo) ||
+            !i2c_read_reg(0x44, ISL_REG_RED_L + 1, &hi))
+            goto read_fail;
+        r = (uint16_t)(((uint16_t)hi << 8) | lo);
+        if (!i2c_read_reg(0x44, ISL_REG_BLUE_L, &lo) ||
+            !i2c_read_reg(0x44, ISL_REG_BLUE_L + 1, &hi))
+            goto read_fail;
+        b = (uint16_t)(((uint16_t)hi << 8) | lo);
+
+        printString("[B] cfg=");
+        print_hex8(cfg1);
+        printString(" st=");
+        print_hex8(st);
+        printString(" g=");
+        printInteger((long)g);
+        printString(" r=");
+        printInteger((long)r);
+        printString(" b=");
+        printInteger((long)b);
+        if (bench_have_prev && (g != g_prev || r != r_prev || b != b_prev))
+            printString(" *");
+        printString("\r\n");
+        g_prev = g;
+        r_prev = r;
+        b_prev = b;
+        bench_have_prev = 1;
+        break;
+read_fail:
+        printString("[B] read FAIL\r\n");
+        break;
+    }
+    default:
+        bench_state = BENCH_SCAN;
+        break;
+    }
+
+    bench_state = (bench_state == BENCH_READ) ? BENCH_SCAN : bench_state;
+}
+
+#endif /* SENSOR_BENCH */

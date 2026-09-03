@@ -58,6 +58,10 @@ WARNINGS := -Werror -Wall -Wundef -Wshadow -Wpointer-arith -Wbad-function-cast \
 ifeq ($(TOLERANT),1)
   WARNINGS := $(subst -Werror,,$(WARNINGS))
 endif
+
+ifeq ($(BENCH),1)
+  CFLAGS   += -DSENSOR_BENCH
+endif
 CFLAGS   := -g -x c -c $(CPUFLAGS) -ffunction-sections -fno-common \
             -Icutcutgo.X/src -Icutcutgo.X/src/config/cutcutgo $(WARNINGS) -mdfp="$(DFP_DIR)" \
             -DXPRJ_cutcutgo=$(CONF)

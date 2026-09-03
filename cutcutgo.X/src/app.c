@@ -56,6 +56,7 @@
 #include "app.h"
 #include "grbl/grbl/grbl.h"
 #include "reset.h"
+#include "hal/debug_probe.h"
 
 
 // *****************************************************************************
@@ -434,15 +435,19 @@ void APP_Initialize(void)
 
     /* Initialize GRBL status. */
     appData.grblInitialized = false;
-    
+
     //serial_init();
     timer_init();
+#ifdef SENSOR_BENCH
+    serial_init();
+#else
     led_init();
     button_init();
     hal_motor_driver_init();
-    
+
     /* Initialize GRBL layer. */
     GRBL_Init();
+#endif
     appData.grblInitialized = true;
 }
 
@@ -466,8 +471,13 @@ void APP_Tasks(void)
 
     if (appData.grblInitialized)
     {
+#ifdef SENSOR_BENCH
+        /* Baremetal head-sensor bench: stream bus scan + RGB, no GRBL. */
+        debug_bench_task();
+#else
         /* GRBL protocol handler */
         protocol_handler();
+#endif
     }
     
     if (system_is_idle())
