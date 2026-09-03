@@ -652,7 +652,6 @@ read_fail:
         bench_state = BENCH_SCAN;
         break;
     }
-    case BENCH_SCAN:
     default:
         break;
     }
