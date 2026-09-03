@@ -525,8 +525,6 @@ typedef enum {
 
 static bench_state_t bench_state = BENCH_SCAN;
 static uint32_t bench_next_ms;
-static uint16_t g_prev, r_prev, b_prev;
-static uint8_t bench_have_prev;
 
 static uint8_t i2c_probe(uint8_t addr)
 {
@@ -644,42 +642,20 @@ void debug_bench_task(void)
         bench_state = BENCH_READ;
         break;
     case BENCH_READ: {
-        uint8_t cfg1, st, lo, hi;
-        uint16_t g, r, b;
+        uint8_t d[6];
+        uint8_t reg;
 
         i2c_recover();
-        if (!i2c_read_reg(0x44, ISL_REG_CFG1, &cfg1) ||
-            !i2c_read_reg(0x44, ISL_REG_STATUS, &st) ||
-            !i2c_read_reg(0x44, ISL_REG_GREEN_L, &lo) ||
-            !i2c_read_reg(0x44, ISL_REG_GREEN_L + 1, &hi))
-            goto read_fail;
-        g = (uint16_t)(((uint16_t)hi << 8) | lo);
-        if (!i2c_read_reg(0x44, ISL_REG_RED_L, &lo) ||
-            !i2c_read_reg(0x44, ISL_REG_RED_L + 1, &hi))
-            goto read_fail;
-        r = (uint16_t)(((uint16_t)hi << 8) | lo);
-        if (!i2c_read_reg(0x44, ISL_REG_BLUE_L, &lo) ||
-            !i2c_read_reg(0x44, ISL_REG_BLUE_L + 1, &hi))
-            goto read_fail;
-        b = (uint16_t)(((uint16_t)hi << 8) | lo);
-
-        printString("[B] cfg=");
-        print_hex8(cfg1);
-        printString(" st=");
-        print_hex8(st);
-        printString(" g=");
-        printInteger((long)g);
-        printString(" r=");
-        printInteger((long)r);
-        printString(" b=");
-        printInteger((long)b);
-        if (bench_have_prev && (g != g_prev || r != r_prev || b != b_prev))
-            printString(" *");
+        for (reg = 0; reg < 6; reg++) {
+            if (!i2c_read_reg(0x44, (uint8_t)(ISL_REG_GREEN_L + reg), &d[reg]))
+                goto read_fail;
+        }
+        printString("[B] d:");
+        for (reg = 0; reg < 6; reg++) {
+            printString(" ");
+            print_hex8(d[reg]);
+        }
         printString("\r\n");
-        g_prev = g;
-        r_prev = r;
-        b_prev = b;
-        bench_have_prev = 1;
         break;
 read_fail:
         printString("[B] read FAIL\r\n");
