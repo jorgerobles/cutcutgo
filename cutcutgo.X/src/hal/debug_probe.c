@@ -575,7 +575,7 @@ void debug_bench_task(void)
             print_hex8(id);
             printString("\r\n");
         }
-        bench_state = BENCH_ALT;
+        bench_state = BENCH_CFG;
         break;
     }
     case BENCH_ALT: {
@@ -609,14 +609,24 @@ void debug_bench_task(void)
         break;
     }
     case BENCH_CFG: {
+        static const uint8_t cfg_tab[4][2] = {
+            { 0x0D, 0x3F },
+            { 0x0D, 0x00 },
+            { 0x05, 0x00 },
+            { 0x05, 0x3F },
+        };
+        static uint8_t cfg_i;
         uint8_t ok = 1;
 
         i2c_recover();
-        if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG1, 0x0D))
+        if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG1, cfg_tab[cfg_i][0]))
             ok = 0;
-        if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG2, 0x3F))
+        if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG2, cfg_tab[cfg_i][1]))
             ok = 0;
-        printString(ok ? "[B] cfg ok\r\n" : "[B] cfg FAIL\r\n");
+        printString("[B] set c");
+        printInteger(cfg_i);
+        printString(ok ? " ok\r\n" : " FAIL\r\n");
+        cfg_i = (uint8_t)((cfg_i + 1) & 3);
         bench_state = BENCH_WAIT;
         bench_next_ms = timer_get_ms() + 400;
         break;
