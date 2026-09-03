@@ -515,6 +515,7 @@ uint8_t debug_probe_execute(const char *line)
 typedef enum {
     BENCH_SCAN,
     BENCH_ID,
+    BENCH_ALT,
     BENCH_CFG,
     BENCH_WAIT,
     BENCH_READ
@@ -551,7 +552,7 @@ void debug_bench_task(void)
         printString("[B] bus:");
         for (a = 0x03; a < 0x78; a++) {
             if (i2c_probe(a)) {
-                printString(" 0x");
+                printString(" ");
                 print_hex8(a);
             }
         }
@@ -568,6 +569,25 @@ void debug_bench_task(void)
         else {
             printString("[B] id=");
             print_hex8(id);
+            printString("\r\n");
+        }
+        bench_state = BENCH_ALT;
+        break;
+    }
+    case BENCH_ALT: {
+        uint8_t a, reg, v;
+
+        for (a = 0x03; a <= 0x04; a++) {
+            printString("[B] 0x");
+            print_hex8(a);
+            printString(":");
+            for (reg = 0; reg < 4; reg++) {
+                if (i2c_read_reg(a, reg, &v)) {
+                    printString(" ");
+                    print_hex8(v);
+                } else
+                    printString(" --");
+            }
             printString("\r\n");
         }
         bench_state = BENCH_CFG;
@@ -629,14 +649,13 @@ void debug_bench_task(void)
         break;
 read_fail:
         printString("[B] read FAIL\r\n");
-        break;
-    }
-    default:
         bench_state = BENCH_SCAN;
         break;
     }
-
-    bench_state = (bench_state == BENCH_READ) ? BENCH_SCAN : bench_state;
+    case BENCH_SCAN:
+    default:
+        break;
+    }
 }
 
 #endif /* SENSOR_BENCH */
