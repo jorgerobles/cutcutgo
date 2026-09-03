@@ -204,23 +204,96 @@ static void dbg_i2c_write(uint8_t addr, uint8_t reg, uint8_t val)
     printString("[DBG] i2c write ok\r\n");
 }
 
+static void i2c_recover(void)
+{
+    int i;
+
+    sda_in();
+    for (i = 0; i < 9; i++) {
+        scl_hi();
+        dly();
+        scl_lo();
+        dly();
+    }
+    i2c_stop();
+}
+
+static void i2c_nack(void)
+{
+    sda_in();
+    dly();
+    scl_hi();
+    dly();
+    scl_lo();
+}
+
+static uint8_t i2c_set_pointer(uint8_t addr, uint8_t reg)
+{
+    i2c_start();
+    i2c_write_byte((uint8_t)(addr << 1));
+    if (!i2c_read_ack()) {
+        i2c_stop();
+        return 0;
+    }
+    i2c_write_byte(reg);
+    if (!i2c_read_ack()) {
+        i2c_stop();
+        return 0;
+    }
+    i2c_stop();
+    return 1;
+}
+
+static uint8_t i2c_read_bytes(uint8_t addr, uint8_t *buf, uint8_t n)
+{
+    uint8_t i;
+
+    i2c_start();
+    i2c_write_byte((uint8_t)((addr << 1) | 1));
+    if (!i2c_read_ack()) {
+        i2c_stop();
+        return 0;
+    }
+    for (i = 0; i < n; i++) {
+        buf[i] = i2c_read_byte();
+        if ((uint8_t)(i + 1) < n)
+            i2c_write_ack();
+        else
+            i2c_nack();
+    }
+    i2c_stop();
+    return 1;
+}
+
 static void dbg_rgb(uint8_t addr)
 {
-    uint8_t lo, hi;
+    uint8_t buf[6];
+    uint8_t cfg;
     uint16_t g, r, b;
 
-    dbg_i2c_write(addr, 0x01, 0x05);
-    delay_ms(150);
-    if (!i2c_read_reg(addr, 0x04, &lo) || !i2c_read_reg(addr, 0x05, &hi))
-        goto fail;
-    g = ((uint16_t)hi << 8) | lo;
-    if (!i2c_read_reg(addr, 0x06, &lo) || !i2c_read_reg(addr, 0x07, &hi))
-        goto fail;
-    r = ((uint16_t)hi << 8) | lo;
-    if (!i2c_read_reg(addr, 0x08, &lo) || !i2c_read_reg(addr, 0x09, &hi))
-        goto fail;
-    b = ((uint16_t)hi << 8) | lo;
-
+    i2c_recover();
+    if (!i2c_set_pointer(addr, 0x01)) {
+        printString("[DBG] rgb: ptr fail\r\n");
+        return;
+    }
+    if (!i2c_read_reg(addr, 0x01, &cfg)) {
+        printString("[DBG] rgb: cfg read fail\r\n");
+        return;
+    }
+    printString("[DBG] rgb cfg1=");
+    print_hex8(cfg);
+    printString("\r\n");
+    if (!i2c_set_pointer(addr, 0x04)) {
+        printString("[DBG] rgb: ptr fail\r\n");
+        return;
+    }
+    if (!i2c_read_bytes(addr, buf, 6)) {
+        printString("[DBG] rgb: seq read fail\r\n");
+        return;
+    }
+    g = (uint16_t)(((uint16_t)buf[1] << 8) | buf[0]);
+    r = (uint16_t)(((uint16_t)buf[3] << 8) | buf[2]);
+    b = (uint16_t)(((uint16_t)buf[5] << 8) | buf[4]);
     printString("[DBG] rgb g=");
     printInteger((long)g);
     printString(" r=");
@@ -228,9 +301,6 @@ static void dbg_rgb(uint8_t addr)
     printString(" b=");
     printInteger((long)b);
     printString("\r\n");
-    return;
-fail:
-    printString("[DBG] rgb read fail\r\n");
 }
 
 static void dbg_i2c_scan(void)
