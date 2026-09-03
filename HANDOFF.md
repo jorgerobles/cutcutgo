@@ -1,67 +1,72 @@
 # HANDOFF — CutCutGo / Cricut Maker 1
 
-Fecha: 2026-09-02
-Estado: Fork upstream v1.0 compilable. Handoff limpio para desarrollo.
+Fecha: 2026-09-03
+Estado: Workflow OpenSpec activo. Cambio `head-sensors` en 17/18 tareas (falta regresión en máquina).
 
 ## Qué es este proyecto
 
 Fork de **cutcutgo** de virtualabs: puerto de **GRBL 1.1** al **PIC32MX470F512L** de la Cricut Maker 1.
 Máquina de corte/trazado por GCODE, controlada por USB con senders GRBL estándar.
 
-**Repositorio upstream**: https://github.com/virtualabs/cutcutgo
-**Bootloader**: https://github.com/virtualabs/cutcutgo-bl
+- **Upstream**: https://github.com/virtualabs/cutcutgo
+- **Bootloader**: https://github.com/virtualabs/cutcutgo-bl
+- **Workflow**: OpenSpec (`openspec/changes/`) — cambios: `head-sensors` (activo, 17/18) y `calibration-cycle` (deferido, depende de head-sensors)
 
-## Estado actual
+## Estado actual (rama main, ~40 commits locales SIN push)
 
-- **Compilación verificada**: upstream v1.0 + Docker toolchain (XC32 v4.35) = firmware funcional
-- **Firmware original**: `FIRMWARE_ORIGINAL.uf2` (SHA256: `772b3367...`)
-- **Firmware reconstruido**: `FIRMWARE_FORK.uf2` (SHA256: `54ca9923...`) — idéntico a upstream CI latest
-- **Conclusión**: cualquier código que no compile fue roto por código añadido después del fork, no por el toolchain
+### Hecho en esta sesión (head-sensors)
+- **Workflow de planning**: `openspec/changes/head-sensors/` (proposal/design/specs/tasks) y `calibration-cycle` reescrito para consumir head-sensors.
+- **Sim host-side portado a main** desde develop (SIN el rewrite de nvm/eeprom de develop): `tools/sim/` (Unity 2.7.2, plant, harness). Suite: `make -f tools/sim/Makefile.sim test` → **22/22 verde**.
+- **Debug probe**: comandos serie `$DBGI2C` (scan), `$DBGPWR` (pines), `$DBGSAMP=n` (muestreo), `$DBGI2CR=a,r` / `$DBGI2CW=a,r,v` (regs), `$DBGRGB` (lectura sensor). En `hal/debug_probe.c`.
+- **Baremetal bench** (sin GRBL, motores muertos): `make -f tools/Makefile.firmware BENCH=1 CONF=cutcutgo_bl clean build-one uf2` → stream continuo de bus/config/reflectancia. Último: `bin/BENCH_80469ec.uf2`.
+- **Drivers reales**: `hal/sensors.h` + `hal/sensors_isl.c` (ambos detectores sobre el sensor de reflectancia I2C 0x44). Sim: `tools/sim/plant/sensors_sim.c`. Stub eliminado.
+- **Blade reference**: `grbl/grbl/blade_ref.{h,c}` (core puro, testeado en sim) + `blade_home.{h,c}` (glue): comando `$HB`, query `$BQ`, hook tras `$H` con fallback stall + flag degradado, monitor de integridad y reportes `[BLADE:...]`.
+- Docs: `docs/head-detectors.md` (registro de inspección completo).
 
-## Hardware
+### Hallazgos de hardware (detalle en docs/head-detectors.md)
+- **Sensor**: esclavo I2C en **0x44** (ID reg0 = 0x7D), variante NO estándar de ISL29125: registros 0x09-0x0E son **canales de 8 bits independientes** (no pares RGB 16-bit); CFG2=0x3F NACKea; CFG1=0x05 rompe lecturas.
+- **Config que funciona**: CFG1=0x0D, CFG2=0x00. Canal de reflectancia: **reg 0x0A** (negro ≈ 0x13, rojo ≈ 0x2F, verde ≈ 0x57-0x67, linterna → satura).
+- **I2C crítico**: bit-bang **open-drain con espera de clock-stretch y a ~10 kHz** (dly 2400). A 100 kHz los ACKs son no deterministas. Retry x2 + bus recover (9 pulsos SCL) en cada op.
+- **Iluminación REQUERIDA**: no se encontró iluminador en el head (RD7/8/9 ciclados LOW sin efecto). Luz ambiente bajo el cabezal insuficiente → para calibrar/detectar hace falta **fuente de luz fija externa**. OPEN.
+- Z axis = TOOL1 (motor cuchilla); homing actual: stall-only en `limits.c`.
+- develop = fase 1 GSD (NVM+sim) SIN merges de main — no tocar sin plan (decisión del usuario).
 
-- **MCU**: PIC32MX470F512L @96 MHz, 512 KB flash, 128 KB RAM, sin FPU
-- **Motores**: 5 canales DC con encoder cuadratura óptico (A4950E/A4954)
-- **Conector cabezal J500**: I²C (SDA/SCL), encoders adicionales, motores pinza
-- **Sin endstops**: homing por stall (detecta pérdida de pulsos encoder)
-- **BLE**: módulo RN4678 (sin usar en firmware actual)
+## Pendiente
 
-## Objetivo del proyecto
+1. **Task 4.3 de head-sensors**: regresión GRBL 1.1 (respuestas estándar sin cambios) + verificación en máquina del firmware real `bin/FIRMWARE_d7a63f5.uf2` (con luz fija: `$HB` debe buscar transición del reflector de cuchilla; sin luz → `[BLADE:NOTRANS]` + degradado, seguro).
+2. **Iluminación**: decidir LED externo fijo vs localizar el iluminador original (abierto en docs).
+3. **Change `calibration-cycle`** (deferido): al completar head-sensors, revisar sus artifacts — asume hallazgos ya presentes; añadir decisión de iluminación/umbral blade al planning.
+4. **Push a origin**: ~40 commits locales en main.
 
-Máquina de corte **repetible y segura**:
-- Homing fiable en X/Y/Z
-- Sin stalls falsos ni motores energizados bloqueados
-- Posición/calibración persistida con desvío mínimo medible
-- Detección de herramienta/hoja por I²C
-- Estimación de presión por proxy encoder/PWM
+## Comandos
 
-## Restricciones
+```bash
+# Firmware (Docker, -Werror limpio)
+docker run --rm -v "$PWD":/work -w /work cutcutgo-builder make -f tools/Makefile.firmware all
+# -> dist/cutcutgo_bl/production/Cutcutgo_maker1_bootloader_app.uf2
 
-- **Seguridad física**: ningún cambio de control se prueba en máquina sin pasar antes por simulador host-side
-- **NVM**: flash con erase-before-write (nunca borrar durante movimiento)
-- **Protocolo**: mantener GRBL 1.1 compatibility
-- **Toolchain**: todo por Docker (XC32 v4.35 + DFP 1.5.259)
+# Bench baremetal (sin GRBL/motores)
+docker run --rm -v "$PWD":/work -w /work cutcutgo-builder \
+  bash -c "make -f tools/Makefile.firmware clean CONF=cutcutgo_bl && make -f tools/Makefile.firmware BENCH=1 CONF=cutcutgo_bl build-one uf2"
 
-## Fases planificadas (resumen)
+# Sim host (22 tests)
+make -f tools/Makefile.sim test
 
-1. **Foundation** — Docker tooling, simulador host-side, NVM
-2. **HAL v2** — Motion en lazo cerrado coordinado (PID 1 kHz por motor)
-3. **Homing & Stall** — Homing robusto X/Y/Z, stall detection corregido
-4. **Position Truth** — Sync sys_position con encoders
-5. **Calibración** — Estadística robusta (mediana+MAD), `$C` asistido
-6. **Tool & Pressure** — I²C cabezal, proxy de carga
-7. **Usabilidad** — Botones, UF2 slim, corte E2E
+# Flash (BL mode: PAUSE al encender; montar y copiar)
+udisksctl mount -b /dev/sdd1 && cp bin/FIRMWARE_<hash>.uf2 /run/media/r2d2/Cutcutgo/
 
-## Preguntas abiertas (validar en máquina)
+# Convención de artefactos: bin/FIRMWARE_<hash>.uf2 (commit del código fuente),
+# bench: bin/BENCH_<hash>.uf2. Commits atómicos + "chore: firmware build <hash>".
+```
 
-- Mapeo exacto encoders J500 ↔ RG6-9/RG12-15
-- Función real motor ACCESSORY y POWER_STATE_OUT
-- Lectura I²C EEPROM de herramienta (dirección, formato)
-- Variante de placa instalada (X2 vs X1)
-- Thresholds de stall por eje/fase
+## Comandos serie nuevos (firmware normal)
+
+- `$HB` — blade reference (solo IDLE; luz necesaria)
+- `$BQ` — estado blade (state/ref/valid/degraded)
+- `$DBGI2C|$DBGPWR|$DBGSAMP=n|$DBGI2CR=a,r|$DBGI2CW=a,r,v|$DBGRGB` — debug hardware
 
 ## Referencias
 
-- Docs: https://virtualabs.github.io/cutcutgo/
-- Esquemáticos: tech.html → PDF/SVG
-- Host: inkcut-cutcutgo (fork de InkCut) o cualquier sender GRBL 1.1
+- Docs: https://virtualabs.github.io/cutcutgo/ · Esquemáticos: `schematics/CricutMaker-schematics.pdf`
+- Nota de hardware: `docs/head-detectors.md` (fuente de verdad de constantes de driver)
+- Openspec: `openspec status --change head-sensors`
