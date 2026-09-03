@@ -15,8 +15,10 @@ static void dly(void)
 
 static void scl_hi(void)
 {
-    GPIO_PortOutputEnable(GPIO_PORT_A, SCL_MASK);
-    GPIO_PortSet(GPIO_PORT_A, SCL_MASK);
+    volatile uint16_t t = 10000;
+
+    GPIO_PortInputEnable(GPIO_PORT_A, SCL_MASK);
+    while (t-- && !GPIO_PinRead(GPIO_PIN_RA2)) { }
 }
 
 static void scl_lo(void)
@@ -27,11 +29,12 @@ static void scl_lo(void)
 
 static void sda_out(uint8_t v)
 {
-    GPIO_PortOutputEnable(GPIO_PORT_A, SDA_MASK);
-    if (v)
-        GPIO_PortSet(GPIO_PORT_A, SDA_MASK);
-    else
+    if (v) {
+        GPIO_PortInputEnable(GPIO_PORT_A, SDA_MASK);
+    } else {
+        GPIO_PortOutputEnable(GPIO_PORT_A, SDA_MASK);
         GPIO_PortClear(GPIO_PORT_A, SDA_MASK);
+    }
 }
 
 static void sda_in(void)
