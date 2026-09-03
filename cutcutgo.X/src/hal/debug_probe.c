@@ -518,6 +518,8 @@ typedef enum {
     BENCH_ALT,
     BENCH_CFG,
     BENCH_WAIT,
+    BENCH_PWR,
+    BENCH_WAIT2,
     BENCH_READ
 } bench_state_t;
 
@@ -620,6 +622,25 @@ void debug_bench_task(void)
         break;
     }
     case BENCH_WAIT:
+        bench_state = BENCH_READ;
+        break;
+    case BENCH_PWR: {
+        static const uint32_t masks[3] = { (1 << 7), (1 << 8), (1 << 9) };
+        static int cur = -1;
+
+        if (cur >= 0)
+            GPIO_PortInputEnable(GPIO_PORT_D, masks[cur]);
+        cur = (cur + 1) % 3;
+        GPIO_PortOutputEnable(GPIO_PORT_D, masks[cur]);
+        GPIO_PortClear(GPIO_PORT_D, masks[cur]);
+        printString("[B] pwr RD");
+        printInteger(cur == 0 ? 7 : (cur == 1 ? 8 : 9));
+        printString(" low\r\n");
+        bench_state = BENCH_WAIT2;
+        bench_next_ms = timer_get_ms() + 150;
+        break;
+    }
+    case BENCH_WAIT2:
         bench_state = BENCH_READ;
         break;
     case BENCH_READ: {
