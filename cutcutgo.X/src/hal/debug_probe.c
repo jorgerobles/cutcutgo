@@ -10,7 +10,7 @@
 static void dly(void)
 {
     volatile int i;
-    for (i = 0; i < 240; i++) { }
+    for (i = 0; i < 2400; i++) { }
 }
 
 static void scl_hi(void)
@@ -564,6 +564,8 @@ void debug_bench_task(void)
     case BENCH_ID: {
         uint8_t id;
 
+        i2c_recover();
+
         if (!i2c_read_reg(0x44, ISL_REG_ID, &id))
             printString("[B] id fail\r\n");
         else {
@@ -578,7 +580,8 @@ void debug_bench_task(void)
         uint8_t a, reg, v;
 
         for (a = 0x03; a <= 0x04; a++) {
-            printString("[B] 0x");
+            i2c_recover();
+            printString("[B] ");
             print_hex8(a);
             printString(":");
             for (reg = 0; reg < 4; reg++) {
@@ -590,14 +593,23 @@ void debug_bench_task(void)
             }
             printString("\r\n");
         }
+        i2c_recover();
+        printString("[B] 44:");
+        for (reg = 0; reg < 16; reg++) {
+            if (i2c_read_reg(0x44, reg, &v)) {
+                printString(" ");
+                print_hex8(v);
+            } else
+                printString(" --");
+        }
+        printString("\r\n");
         bench_state = BENCH_CFG;
         break;
     }
     case BENCH_CFG: {
         uint8_t ok = 1;
 
-        dbg_i2c_write(0x44, ISL_REG_ID, 0x46);
-        delay_ms(50);
+        i2c_recover();
         if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG1, 0x0D))
             ok = 0;
         if (!dbg_i2c_write_verify(0x44, ISL_REG_CFG2, 0x3F))
@@ -614,6 +626,7 @@ void debug_bench_task(void)
         uint8_t cfg1, st, lo, hi;
         uint16_t g, r, b;
 
+        i2c_recover();
         if (!i2c_read_reg(0x44, ISL_REG_CFG1, &cfg1) ||
             !i2c_read_reg(0x44, ISL_REG_STATUS, &st) ||
             !i2c_read_reg(0x44, ISL_REG_GREEN_L, &lo) ||
