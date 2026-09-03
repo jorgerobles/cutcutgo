@@ -1,29 +1,25 @@
 # Head detectors: mark detector & blade detector — inspection record
 
-Status: **identified on machine — ISL29125 RGB light sensor** (probing continues).
-Source: `schematics/CricutMaker-schematics.pdf` (rev 2, virtualabs reverse) + on-machine probing.
+Status: **identified and validated on machine** (baremetal bench firmware, 2026-09-03).
+Source: `schematics/CricutMaker-schematics.pdf` (rev 2, virtualabs reverse) + on-device probing.
 
-## Identified: ISL29125 RGB light sensor @ I2C 0x44
+## Identified: I2C light/reflectance sensor @ 0x44 (ISL29125-compatible, partially)
 
-On-machine evidence (firmware `$DBG` probing, 2026-09-03):
-- I2C scan on J500 `SDA_1`/`SCL_1` (MCU RA3/RA2): single responder at **0x44**.
-- Register 0x00 (device ID) reads **0x7D** — the ISL29125 default device ID.
-- Conclusion: the head PCB carries an **ISL29125 RGB digital light sensor**
-  (ADDR low → 0x44). Same reflectivity signal serves both roles:
-  **mark detection** (paper Print-Then-Cut marks) and **tool/blade detection**
-  (QuickSwap gear flash/notches scanned during homing), per Cricut behavior and
-  community reverse-engineering.
+On-machine evidence (bench firmware):
+- I2C scan on J500 `SDA_1`/`SCL_1` (MCU RA3/RA2): single responder at **0x44**, ID reg 0x00 = **0x7D** (ISL29125 device ID).
+- **NOT bit-exact ISL29125 behavior**: data registers 0x09-0x0E behave as independent 8-bit channels (not 16-bit RGB pairs); CFG2=0x3F NACKs on write (value-validated); CFG1=0x05 (valid ISL29125 mode) breaks reads while 0x0D works. Suspected Cricut-variant silicon/firmware.
+- Working config: **CFG1=0x0D, CFG2=0x00**; writes verified with read-back; retry x2 + bus recover (9 SCL pulses) on NACK.
+- **Reflectance channel: register 0x0A** responds strongly to surfaces under the sensor (black ≈ 0x1B, colored paper 0x33-0x7F+, flashlight → saturation).
+- **Illumination is REQUIRED**: no head illuminator found on RD7/RD8/RD9 (cycled low, no visible light, no reading change). Ambient light under the head is insufficient — an **external fixed light source** is required for reflectance sensing until the original illumination path is found. OPEN ITEM.
+- I2C must be **slow (~10 kHz)** and open-drain with clock-stretch wait; at ~100 kHz ACKs become non-deterministic.
 
-ISL29125 register map (for driver implementation):
-| Reg | Name        | Notes                                      |
-|-----|-------------|--------------------------------------------|
-|0x00 | Device ID   | 0x7D                                       |
-|0x01 | CFG1        | power-down after reset; write 0x05 = RGB mode, 16-bit, 375 lux (0x0D = 10000 lux range) |
-|0x02 | CFG2        | IR compensation / filtering                |
-|0x03 | CFG3        | RGB conversion-done flags, IRQ             |
-|0x04/05 | G low/high | 16-bit                                  |
-|0x06/07 | R low/high | 16-bit                                  |
-|0x08/09 | B low/high | 16-bit                                  |
+## Driver mapping (implemented in `hal/sensors_isl.c`)
+
+- Both detectors share the 0x44 reflectance sensor.
+- `mark_detector_read` → channel 0x0A as Q16 (byte << 8).
+- `blade_detector_read` → channel 0x0A thresholded (`ISL_BLADE_THRESHOLD`).
+- Self-test: ID reg == 0x7D.
+- Simulator equivalents in `tools/sim/plant/sensors_sim.c` keep host tests green.
 
 GPIO probing results: RD7/RD8/RD9 (and RA2/RA3 as GPIO) held high, **zero
 transitions** during 2 s sampling windows with actuation → no discrete detector
