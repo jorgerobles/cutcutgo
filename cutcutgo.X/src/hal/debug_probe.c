@@ -623,19 +623,31 @@ void debug_bench_task(void)
         bench_state = BENCH_READ;
         break;
     case BENCH_PWR: {
-        static const uint32_t masks[3] = { (1 << 7), (1 << 8), (1 << 9) };
-        static int cur = -1;
+        static const uint8_t led_tab[][2] = {
+            { 0x03, 0x00 }, { 0x03, 0x10 }, { 0x03, 0x20 }, { 0x03, 0x40 },
+            { 0x03, 0x80 }, { 0x03, 0xFF },
+            { 0x04, 0x00 }, { 0x04, 0xFF },
+            { 0x05, 0x00 }, { 0x05, 0xFF },
+            { 0x06, 0x00 }, { 0x06, 0xFF },
+            { 0x07, 0x00 }, { 0x07, 0xFF },
+            { 0x01, 0x0C }, { 0x01, 0x0E }, { 0x01, 0x0F },
+            { 0x01, 0x1D }, { 0x01, 0x2D }, { 0x01, 0x4D }, { 0x01, 0x8D },
+            { 0x01, 0xCD }, { 0x01, 0xDD },
+        };
+        static uint8_t idx;
 
-        if (cur >= 0)
-            GPIO_PortInputEnable(GPIO_PORT_D, masks[cur]);
-        cur = (cur + 1) % 3;
-        GPIO_PortOutputEnable(GPIO_PORT_D, masks[cur]);
-        GPIO_PortClear(GPIO_PORT_D, masks[cur]);
-        printString("[B] pwr RD");
-        printInteger(cur == 0 ? 7 : (cur == 1 ? 8 : 9));
-        printString(" low\r\n");
+        i2c_recover();
+        dbg_i2c_write_verify(0x44, ISL_REG_CFG1, 0x0D);
+        dbg_i2c_write_verify(0x44, ISL_REG_CFG2, 0x00);
+        dbg_i2c_write(0x44, led_tab[idx][0], led_tab[idx][1]);
+        printString("[B] led r=");
+        print_hex8(led_tab[idx][0]);
+        printString(" v=");
+        print_hex8(led_tab[idx][1]);
+        printString("\r\n");
+        idx = (uint8_t)((idx + 1) % (sizeof(led_tab) / sizeof(led_tab[0])));
         bench_state = BENCH_WAIT2;
-        bench_next_ms = timer_get_ms() + 150;
+        bench_next_ms = timer_get_ms() + 200;
         break;
     }
     case BENCH_WAIT2:
