@@ -71,3 +71,42 @@ X/Y encoders (RG0/1, RG6/7) go to the X/Y motor JST connectors, not J500.
 - [ ] Board variant (X1 vs X2) of the unit under test.
 
 Driver constants in `hal/sensors*` MUST equal the values recorded here once probing completes.
+
+## Console access (tools/tty.py)
+
+Interact with the machine over its USB CDC port (115200) through `tools/tty.py`.
+Three subcommands cover send / wait-for / monitor. The port is auto-detected
+(`*cutcutgo*`, `*pic32*`, `*cdc*` on `/dev/serial/by-id`, else the lone
+`/dev/ttyACM*`/`/dev/ttyUSB*`); force it with `--dev`.
+
+Exit codes: **0 ok**, **2 device/lock unavailable**, **3 timeout**.
+
+### send — send a command, capture until ok/error/timeout
+```
+python3 tools/tty.py send '$BQ' --echo
+```
+Drains the buffer, writes `$BQ\r\n`, prints the echoed command (`--echo`), then
+prints every line until it sees `ok`/`error` or the timeout elapses (default
+10 s, override with `--timeout`).
+
+### waitfor — print lines until a regex matches
+```
+python3 tools/tty.py waitfor '\[B\]' --timeout 30
+```
+Streaming capture for a bench marker: prints each line until one matches the
+regex, then exits 0. Use this to grab the `[B]` lines the head sensor emits.
+Timeouts return 3 (default window 30 s).
+
+### monitor — raw stream for N seconds
+```
+python3 tools/tty.py monitor
+```
+Raw passthrough for the default 10 s (`--secs`). No `ok`/`error` early exit —
+reads until the window closes.
+
+### Console locking (flock)
+Each `Console` opens `/tmp/cutcutgo-tty-<dev>.lock` and takes an exclusive
+`flock`. This stops two operator terminals from writing at once — the second
+one fails to grab the lock and exits **2** ("console busy"). Release the lock
+by closing the terminal/tty; while another operator holds it, any new run exits
+2 rather than clobbering the shared buffer.
