@@ -65,6 +65,13 @@ CFLAGS   := -g -x c -c $(CPUFLAGS) -ffunction-sections -fno-common \
 
 ifeq ($(BENCH),1)
   CFLAGS   += -DSENSOR_BENCH
+  BUILD_DIR := build/$(CONF)-bench/production
+  DIST_DIR  := dist/$(CONF)-bench/production
+  ELF       := $(DIST_DIR)/cutcutgo.X.production.elf
+  HEX       := $(DIST_DIR)/cutcutgo.X.production.hex
+  MAP       := $(DIST_DIR)/cutcutgo.X.production.map
+  BIN       := $(DIST_DIR)/cutcutgo.X.production.bin
+  UF2       := $(DIST_DIR)/Cutcutgo_maker1_bootloader_app.uf2
 endif
 
 # Per-configuration linker script (standalone vs bootloader layout).
