@@ -91,7 +91,9 @@ Criterios de paso:
 - **BREAKING: el chip 0x44 es un ISL29125 real** (ID 0x7D = firma ISL29125; CFG1=0x0D = "RGB,16-bit,375lux,start"). Regs 0x08-0x0D = pares 16-bit: verde(8,9), rojo(10,11), azul(12,13). Relectura de los diffs llave-in/out con esa estructura: verde 512→257, rojo 263→259 con llave puesta → respuesta óptica REAL del hueco lateral por los canales RGB. No hay "línea receptora" separada: el ISL29125 es el receptor de ambas rutas ópticas (tubos de luz).
 - **Teoría de detección stock (a verificar)**: "spin test" = muestrear RGB mientras A rota la hoja → modulación por el triángulo (hipótesis original del operador). Siguiente sesión: burst-sample de los 3 canales durante rotación lenta de A con hoja real → forma de onda → umbrales → integración en blade_home. (Descartadas: TCS3472/0x29/EEPROM 0x50 de la conversación con otra IA — contradicen nuestras mediciones: único respondedor 0x44, ID 0x7D.)
 
-## 6. Recomendación
+- **CONFIRMADO CON DATASHEET (Renesas ISL29125)**: mapa oficial calza 1:1 con nuestras lecturas — ID 0x00=0x7D; CFG1 0x01 (SYNC/BITS/RNG/MODE, escribimos 0x0D); CFG2 0x02 (IRCOMP bit7 + ALSCC[5:0] — la variante Cricut NACKA el bit7: IRComp retirado); umbral-alto 0x06/07 default 0xFF/0xFF (nuestro "255,255"); STATUS 0x08 (RGBTHF/BOUTF/CONVENF — nuestro "8=7"); GREEN 0x09/0x0A, RED 0x0B/0x0C, BLUE 0x0D/0x0E (16-bit cada uno).
+- **CANAL VERDE = ruta lateral de hoja**: llave dentro verde=0x0301 (769) vs fuera 0x0700 (1792) — 2.3x. El "canal 0x0A" histórico del mark detector = byte alto GREEN. El firmware stock probablemente: fija umbrales (0x04-0x07) + INTSEL y sondea STATUS/RGBTHF durante el giro de A.
+- **Diseño de detección propio (próxima sesión)**: leer GREEN 16-bit (regs 9,10) como canal de hoja; calibrar umbrales con hoja arriba/abajo y rotación de A; evaluar interrupción por umbral (CFG3 INTSEL) en vez de polling.
 
 - **¿Promover A a un eje completo de G-code?** `______` (gated sobre la evidencia de
   la sección 4: sin pérdidas de detección y sin interferencia en Z).
