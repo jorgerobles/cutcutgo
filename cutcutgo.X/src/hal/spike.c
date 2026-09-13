@@ -281,6 +281,25 @@ static void input_dump(void)
     printString("\r\n");
 }
 
+/* Full register sweep of the head chip: the blade receiver may sit on a
+ * register beyond the known 0x09-0x0E window. */
+static void register_dump(void)
+{
+    uint8_t r, v;
+
+    for (r = 0; r <= 0x3F; r++) {
+        v = 0;
+        if (!sensors_isl_read_reg(r, &v))
+            continue;
+        printString("[D] ");
+        printInteger(r);
+        printString("=");
+        printInteger(v);
+        printString("\r\n");
+    }
+    printString("[D] end\r\n");
+}
+
 static void console_exec(char *line)
 {
     char *w[4];
@@ -296,6 +315,11 @@ static void console_exec(char *line)
         return;
 
     if (n == 1 && !strcmp(w[0], "t")) { telemetry(); return; }
+    if (n == 1 && !strcmp(w[0], "d")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        register_dump();
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "i")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         input_dump();
