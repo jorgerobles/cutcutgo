@@ -98,6 +98,15 @@ Criterios de paso:
 - **¿Promover A a un eje completo de G-code?** `______` (gated sobre la evidencia de
   la sección 4: sin pérdidas de detección y sin interferencia en Z).
 
+## PRIMERA TAREA PRÓXIMA SESIÓN: bench 'S' (histograma de transiciones)
+
+Contexto: emisor IR siempre encendido (foto), ISL29125 ve el hueco por GREEN (769 vs 1792 con llave), pero 14 líneas del ribbon leídas como niveles estáticos no se movieron. Lo que puede estar colándose:
+1. **Niveles analógicos** — un fototransistor a media tensión leído por GPIO digital colapsa a un 0/1 constante.
+2. **Pulsos/frecuencia** — los pares "encoder" de J500 son lecturas ópticas del portaherramientas; la señal son transiciones, invisible a un dump de niveles.
+3. **Interacción dinámica** — nunca giramos A mientras leíamos esas líneas.
+
+Bench 'S' en spike.c: sondeo continuo de las 14 líneas candidatas contando CAMBIOS de nivel por pin, en 3 ventanas de 1 s: (a) baseline sin girar, (b) A girando lento (cw @1900), (c) parado. Histograma final. Toda línea con transiciones correlacionadas con el giro = lector IR. Requisito: hoja/key EN el hueco (bajar Z2 a la ventana). Beep + GO, sin pasarse del fin de carrera.
+
 ## 7. Nota sobre inconsistencia preexistente
 
 Preservada sin cambios en el rename de símbolos (task 3.x):
