@@ -8,9 +8,9 @@
  *
  *   -> Vx != Vy, mais Vmin < Vx < Vmax et Vmin < Vy < Vmax -> on asservit la vitesse en fonction de la position
  * 
- *   -> si jamais Vx < Vmin ou Vy < Vmin, on asservit l'axe "lent" en position avec une résolution de 0.1mm ?
+ *   -> si jamais Vx < Vmin ou Vy < Vmin, on asservit l'axe "lent" en position avec une rï¿½solution de 0.1mm ?
  * 
- *     => on peut dresser un profil d'accélération/décelération du moteur pour 10 pas (précision de 0.1mm)
+ *     => on peut dresser un profil d'accï¿½lï¿½ration/dï¿½celï¿½ration du moteur pour 10 pas (prï¿½cision de 0.1mm)
  * 
  */
 
@@ -577,10 +577,14 @@ void st_execute_next_step(void)
                 /* Watchdog is armed and motor is stalled. First, cut motor. */
                 hal_motor_set_direction(stepper_info.motor_current, HAL_MOTOR_STOP);
                 stepper_info.motor_current->state = HAL_MOTOR_IDLE;
-                
-                /* Tell GRBL we hit an hard limit. */
-                limits_set_state(stepper_info.motor_current->grbl_axis, true);
-                
+
+                /* Non-critical alarm: position truth is intact (encoder did
+                   not count, sys_position unchanged). Keep the firmware alive
+                   so the host can unlock with '$X'. A HARD_LIMIT here would
+                   enter the blocking critical loop (firmware dead until
+                   realtime reset). */
+                system_set_exec_alarm(EXEC_ALARM_ABORT_CYCLE);
+
                 /* No motor is driven. */
                 stepper_info.motor_current = NULL;
             }
