@@ -1,0 +1,83 @@
+# Spike: motor A (hoja) vs. Z2 — verificación de pines y detección de hoja
+
+Status: **pendiente de ejecución** (nota esqueleto, sin datos de máquina).
+Propósito: verificar en hardware la asignación de pines de Z2 / A y comprobar que el
+eje A (wormgear de rotación de hoja, sobre el eje Z2) puede moverse sin interrumpir la
+detección de hoja.
+
+> Docs-only: esta nota es el esqueleto de un spike de hardware. Los valores marcados
+> con `______` se rellenan **durante** la sesión supervisada sobre la máquina.
+
+## 1. Objetivo
+
+- Verificar la asignación de pines **Z2 / A** en hardware (bare metal, firmware de
+  depuración con `$DBG` + jogging manual).
+- Mover el **A** (rotación de hoja, deuter metal) mientras la detección de hoja sigue
+  emitiendo reportes `[BLADE:*]`.
+- Recomendar si el **A** debe promoverse a un **eje completo de G-code** (gated sobre
+  la evidencia obtenida en el spike).
+
+## 2. Seguridad
+
+- **Sesión supervisada únicamente** (no correr sin operador presente).
+- Mover **solo A** (rotación de hoja) y **milisegundos de Z2** (jog cortísimo).
+- **Nunca X / Y** durante este spike (masa de corte no probada).
+- **Abort = soft reset** (`ctrl-x`) o **apagado** de la unidad.
+- El **A queda desenergizado en idle** (A4950 en brake/hold controlado); no queda
+  energizado entre comandos.
+
+## 3. Verificación de pines Z2 / A
+
+Comparar los dos conjuntos de pines candidatos contra el comportamiento real de la
+máquina. Rellenar los resultados observados durante la sesión.
+
+| Etapa | Acción | Resultado observado |
+|-------|--------|---------------------|
+| Baseline | Detección de hoja en idle (reportes `[BLADE:*]` streaming) | `______` |
+| Jog candidato Z2 | Jog del conjunto `MOTOR_Z2_*` | `______` (mueve carriage / solo hoja) |
+| Jog candidato A | Jog del conjunto `MOTOR_A_*` | `______` (hoja / carriage) |
+| Conclusión | ¿asignación correcta o intercambiada? | `______` |
+
+Pines candidatos (de `hal/config.h`):
+
+| Motriz | IN1 | IN2 | ENC_A | ENC_B | OCM |
+|--------|-----|-----|-------|-------|-----|
+| Candidato Z2 (`MOTOR_Z2_*`) | RB6 | RD5 | RG14 | RG15 | 2 |
+| Candidato A (`MOTOR_A_*`) | RD3 | RD11 | RG8 | RG9 | 4 |
+
+## 4. Prueba A + detección de hoja
+
+Con la detección de hoja emitiendo reportes (`[BLADE:*]`), mover A en ambas
+direcciones y comprobar que el stream del detector no se interrumpe.
+
+| Dirección | Comando | Resultado stream `[BLADE:*]` | `BLADE:LOSS` | Z counters |
+|-----------|---------|------------------------------|--------------|------------|
+| A CW | `$DBGMOTOR=A,CW,<ms>` | `______` | no / sí | `______` |
+| A CCW | `$DBGMOTOR=A,CCW,<ms>` | `______` | no / sí | `______` |
+
+Criterios de paso:
+- Stream del detector **sin interrupciones** durante todo el jog.
+- **Sin** `BLADE:LOSS`.
+- **Contadores Z intactos** (sin avance por el jog de A).
+
+## 5. Hallazgos
+
+- **Asignación de pines final**: `______`
+- **Dirección / velocidad / encoder de A**: `______`
+- **Comportamiento de detección de hoja** al mover A: `______`
+
+## 6. Recomendación
+
+- **¿Promover A a un eje completo de G-code?** `______` (gated sobre la evidencia de
+  la sección 4: sin pérdidas de detección y sin interferencia en Z).
+
+## 7. Nota sobre inconsistencia preexistente
+
+Preservada sin cambios en el rename de símbolos (task 3.x):
+
+- `st_select_tool()` → tool 1 (`mark`) asocia `DEFAULT_Z1_STEPS_PER_MM`.
+- `st_prep_buffer()` → TOOL2 (blade) asocia `DEFAULT_Z2_STEPS_PER_MM` para `step_dtz`.
+
+Es decir, los **rates se asocian de forma cruzada** respecto a la nueva
+vocabularía Z1/Z2/A. **A confirmar en el spike** si esta asociación cruzada es la
+comportamiento esperado o introduce desviaciones medibles en `step_dtz`.
