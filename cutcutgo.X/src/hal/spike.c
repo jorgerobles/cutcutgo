@@ -544,6 +544,10 @@ void spike_task(void)
         }
         break;
 
+    case SPIKE_G_SPIN:
+        /* handled above via gemini_spin_tick() */
+        break;
+
     case SPIKE_STREAM:
         if ((uint32_t)(now - spike_next_ms) >= 100) {
             spike_next_ms = now;
