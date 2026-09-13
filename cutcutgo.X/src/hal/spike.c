@@ -146,11 +146,10 @@ static int32_t refl_raw(void)
  * All motor IN pins are excluded (they are fully accounted for by the HAL). */
 typedef struct { const char *n; GPIO_PIN p; } gp_t;
 static const gp_t probes[] = {
-    { "rb15", GPIO_PIN_RB15 }, { "rb2", GPIO_PIN_RB2 }, { "rb3", GPIO_PIN_RB3 },
-    { "rb4", GPIO_PIN_RB4 },   { "rb7", GPIO_PIN_RB7 }, { "rb8", GPIO_PIN_RB8 },
-    { "rb9", GPIO_PIN_RB9 },   { "rd4", GPIO_PIN_RD4 }, { "rd6", GPIO_PIN_RD6 },
-    { "rd7", GPIO_PIN_RD7 },   { "rd10", GPIO_PIN_RD10 }, { "rd13", GPIO_PIN_RD13 },
-    { "rd14", GPIO_PIN_RD14 }, { "rd15", GPIO_PIN_RD15 }, { "rf2", GPIO_PIN_RF2 },
+    { "rd8", GPIO_PIN_RD8 },   { "rd9", GPIO_PIN_RD9 },
+    { "rg8", GPIO_PIN_RG8 },   { "rg9", GPIO_PIN_RG9 },
+    { "rg12", GPIO_PIN_RG12 }, { "rg13", GPIO_PIN_RG13 },
+    { "rg14", GPIO_PIN_RG14 }, { "rg15", GPIO_PIN_RG15 },
 };
 
 static void probe_sweep(void)
