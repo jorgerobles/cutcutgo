@@ -80,7 +80,8 @@ Criterios de paso:
 ## Abiertos (nuevos, sesión 2)
 
 - **Home de A / ambigüedad de fase**: un triángulo da oclusión máxima a 0/120/240° — ¿cómo desambigua la máquina? Hipótesis: (1) amplitud distinta por cara (recubrimiento vs acero), (2) home por flanco de transición (vértice→plano) y no por máximo, (3) referencia de fase del portaherramientas. Experimento previsto: rotar A 360° a Z fija muestreando canales → forma de onda de oclusión real.
-- **LED IR no encontrado**: 33 GPIO + CFG1/CFG2 completos sin enable; soporte Cricut confirma "LED IR propio del detector lateral". Pistas: Q7/POWER_STATE_OUT (pin MCU POWER_TRIGGER no identificado en el esquemático), LED muerto en esta unidad, o pulsado solo en rutinas stock. Ch10 responde a luz ambiente: claro=7, ocluido=3.
+- **LED IR no encontrado** (cerrado por ahora): 33 GPIO (todas lasbandas RE/RC/RA/RB/RD/RF/RG candidatas) + CFG1/CFG2 completos sin enable; soporte Cricut confirma "LED IR propio del detector lateral". Sin él, el detector lateral NO detecta: en la inmersión con el collar ocluyendo visiblemente el hueco, ch10 NO cambió (7→7). Pista restante: traza física de continuidad desde puerta de Q7 (POWER_TRIGGER) hasta el MCU, o consultar a virtualabs.
+- **Geometría de detección real**: al sumergir el portaherramientas, es el COLLAR de agarre (no la punta) lo que cruza la ventana lateral → la firma de detección stock probablemente sea la oclusión del collar con LED IR propio.
 - **Geometría confirmada con fotos**: sensor mira lateral al hueco del portaherramientas B, reflector enfrente, punta de hoja cruza el hueco; engranaje latón superior = eje A.
 
 ## 6. Recomendación
