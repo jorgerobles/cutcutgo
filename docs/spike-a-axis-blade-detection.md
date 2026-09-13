@@ -88,6 +88,9 @@ Criterios de paso:
 - **Receptor IR no localizado** (siguiente sesión): no está en niveles estáticos de 14 líneas del ribbon ni en registros I2C. Hipótesis fuerte: salida modulada/frecuencia (fotodiodo inmune a luz ambiente) → hace falta muestreo de transiciones por línea, scope/multímetro en la PCB de cabeza, o las notas de virtualabs.
 - **Emisor IR confirmado vivo y siempre encendido** (foto con cámara de móvil: brillo rosa en el knob superior).
 
+- **BREAKING: el chip 0x44 es un ISL29125 real** (ID 0x7D = firma ISL29125; CFG1=0x0D = "RGB,16-bit,375lux,start"). Regs 0x08-0x0D = pares 16-bit: verde(8,9), rojo(10,11), azul(12,13). Relectura de los diffs llave-in/out con esa estructura: verde 512→257, rojo 263→259 con llave puesta → respuesta óptica REAL del hueco lateral por los canales RGB. No hay "línea receptora" separada: el ISL29125 es el receptor de ambas rutas ópticas (tubos de luz).
+- **Teoría de detección stock (a verificar)**: "spin test" = muestrear RGB mientras A rota la hoja → modulación por el triángulo (hipótesis original del operador). Siguiente sesión: burst-sample de los 3 canales durante rotación lenta de A con hoja real → forma de onda → umbrales → integración en blade_home. (Descartadas: TCS3472/0x29/EEPROM 0x50 de la conversación con otra IA — contradicen nuestras mediciones: único respondedor 0x44, ID 0x7D.)
+
 ## 6. Recomendación
 
 - **¿Promover A a un eje completo de G-code?** `______` (gated sobre la evidencia de
