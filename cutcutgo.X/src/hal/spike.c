@@ -160,15 +160,18 @@ static void probe_sweep(void)
     uint8_t i;
     int32_t hi, lo;
 
-    printString("[P] sweep start (idle refl restored high after each)\r\n");
+    printString("[P] slow sweep: watch the sensor area (phone cam) - 2s hold per pin\r\n");
     for (i = 0; i < sizeof(probes) / sizeof(probes[0]); i++) {
         GPIO_PinOutputEnable(probes[i].p);
+        printString("[P] >>> NOW: ");
+        printString(probes[i].n);
+        printString(" HIGH 2s <<<\r\n");
         GPIO_PinWrite(probes[i].p, true);
-        _delay_ms(120);
+        _delay_ms(2000);
         hi = refl_raw();
 
         GPIO_PinWrite(probes[i].p, false);
-        _delay_ms(300);
+        _delay_ms(400);
         lo = refl_raw();
 
         GPIO_PinWrite(probes[i].p, true);
