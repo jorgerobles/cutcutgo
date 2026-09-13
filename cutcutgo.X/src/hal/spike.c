@@ -251,6 +251,33 @@ static void cfg_scan(void)
     printString("[S] scan done, cfg1=0x0D cfg2=0x00 restored\r\n");
 }
 
+/* Read every head-ribbon candidate pin as a digital input. The lateral
+ * blade sensor's phototransistor output may sit on an "encoder-labelled"
+ * line; diff blade-in vs blade-out to find it. */
+static void input_dump(void)
+{
+    uint8_t i;
+    static const gp_t ins[] = {
+        { "rg8", GPIO_PIN_RG8 },   { "rg9", GPIO_PIN_RG9 },
+        { "rg12", GPIO_PIN_RG12 }, { "rg13", GPIO_PIN_RG13 },
+        { "rg14", GPIO_PIN_RG14 }, { "rg15", GPIO_PIN_RG15 },
+        { "rd8", GPIO_PIN_RD8 },   { "rd9", GPIO_PIN_RD9 },
+        { "rb12", GPIO_PIN_RB12 }, { "rb13", GPIO_PIN_RB13 },
+        { "ra4", GPIO_PIN_RA4 },   { "ra5", GPIO_PIN_RA5 },
+        { "ra6", GPIO_PIN_RA6 },   { "ra7", GPIO_PIN_RA7 },
+    };
+
+    printString("[I]");
+    for (i = 0; i < sizeof(ins) / sizeof(ins[0]); i++) {
+        GPIO_PinInputEnable(ins[i].p);
+        printString(" ");
+        printString(ins[i].n);
+        printString("=");
+        printInteger(GPIO_PinRead(ins[i].p) ? 1 : 0);
+    }
+    printString("\r\n");
+}
+
 static void console_exec(char *line)
 {
     char *w[4];
@@ -266,6 +293,11 @@ static void console_exec(char *line)
         return;
 
     if (n == 1 && !strcmp(w[0], "t")) { telemetry(); return; }
+    if (n == 1 && !strcmp(w[0], "i")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        input_dump();
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "c")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         channel_dump();
