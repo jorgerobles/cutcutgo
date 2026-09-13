@@ -1,7 +1,7 @@
 # HANDOFF — CutCutGo / Cricut Maker 1
 
-Fecha: 2026-09-03
-Estado: Workflow OpenSpec activo. Cambio `head-sensors` en 17/18 tareas (falta regresión en máquina).
+Fecha: 2026-09-03 (sesión 2)
+Estado: head-sensors 18/18 + tty-connect 6/6. Firmware en máquina: `bin/FIRMWARE_c53ed76.uf2` (fix de stall NO verificado en máquina — ver bugs residuales).
 
 ## Qué es este proyecto
 
@@ -33,10 +33,15 @@ Máquina de corte/trazado por GCODE, controlada por USB con senders GRBL estánd
 
 ## Pendiente
 
-1. **Task 4.3 de head-sensors**: regresión GRBL 1.1 (respuestas estándar sin cambios) + verificación en máquina del firmware real `bin/FIRMWARE_d7a63f5.uf2` (con luz fija: `$HB` debe buscar transición del reflector de cuchilla; sin luz → `[BLADE:NOTRANS]` + degradado, seguro).
-2. **Iluminación**: decidir LED externo fijo vs localizar el iluminador original (abierto en docs).
-3. **Change `calibration-cycle`** (deferido): al completar head-sensors, revisar sus artifacts — asume hallazgos ya presentes; añadir decisión de iluminación/umbral blade al planning.
-4. **Push a origin**: ~40 commits locales en main.
+1. **BUGS RESIDUALES de firmware (prioridad, requiere sesión con bancada)**:
+   - a) Fix de stall alarm (c53ed76: ABORT_CYCLE no-bloqueante) NO verificado en máquina. Test: con herramienta FUERA, `T1`+`G1 Z2 F150` → esperado `ALARM:9` + firmware vivo + `$X` desbloquea.
+   - b) Unlock ($X) durante warmup interrumpido → reanuda en bucle `<Run>` congelado (MPos 0).
+   - c) ctrl-X (0x18) en ese estado → firmware no-responsivo total (solo power cycle).
+   - d) Boot con herramienta FUERA → warmup homing en bucle infinito (el encoder de TOOL2 engrana con la herramienta). Restricción operativa: nunca reiniciar sin herramienta cepada.
+2. **Mapeo de canales de motor** (`$DBGMOTOR=ch,dir,ms` ya implementado en firmware `fad0d2d+`): probar `ACC,CW,500` → ¿gira el engranaje del cuchillo? HAL tiene 5 canales: X, Y, TOOL1(=T0, sin efecto visible), TOOL2(=T1, **worm del plunger de cuchilla**, OCM2 ¡conflicto con X!), ACCESSORY (sin ruta G-code).
+3. **Iluminación**: sensor 0x44 requiere luz externa fija (no se encontró iluminador en head; RD7/8/9 descartados). LED-hunt por registros del esclavo 0x44 a medias (bench `BENCH_33566cd`).
+4. **Change `calibration-cycle`** (deferido): artifacts listos; añadir decisión de iluminación/umbral blade.
+5. **Push a origin**: ~55 commits locales en main.
 
 ## Comandos
 
@@ -61,9 +66,25 @@ udisksctl mount -b /dev/sdd1 && cp bin/FIRMWARE_<hash>.uf2 /run/media/r2d2/Cutcu
 
 ## Comandos serie nuevos (firmware normal)
 
-- `$HB` — blade reference (solo IDLE; luz necesaria)
-- `$BQ` — estado blade (state/ref/valid/degraded)
-- `$DBGI2C|$DBGPWR|$DBGSAMP=n|$DBGI2CR=a,r|$DBGI2CW=a,r,v|$DBGRGB` — debug hardware
+- `$HB` — blade reference (solo IDLE; luz necesaria) · `$BQ` — estado blade
+- `$DBGI2C|$DBGPWR|$DBGSAMP=n|$DBGI2CR=a,r|$DBGI2CW=a,r,v|$DBGRGB` — debug hardware (requieren IDLE; error:8 si no)
+- `$DBGMOTOR=<ch>,<dir>,<ms>` — drive directo de un canal HAL (ch: T1/T2/ACC/X/Y; dir: CW/CCW; ms<=2000, velocidad suave)
+
+## Tooling de sesión (nuevo)
+
+- `tools/tty.py` — consola serie scripted: `send` (delimita ok/error, exit 3 timeout), `monitor --secs`, `waitfor regex`; flock por device; exit 2 sin dispositivo. EL agente habla con la máquina sin copy-paste.
+- `tools/flash.sh <uf2> [tmo]` — flasheo determinista en BL: espera unidad "Cutcutgo", monta, copia, detecta re-enumeración CDC **por hardware-id** (no por puerto). La carrera del BL está resuelta.
+- `tools/llm.sh` — delegación a modelo local ornith (puerto 8090, OpenAI-compatible).
+- opencode: agente `delegate` (subagent → llama.cpp/local-llama-256) + plugin `.opencode/plugin/local-delegate.ts` (pinea explore/general al modelo local; escape `[main-model]`). Reiniciar opencode para cargar.
+- NOTA de delegación: el 9B NO para scripts/flash — eso es tooling determinista. Delegar solo cognición (resúmenes, análisis).
+
+## Hallazgos hardware/máquina (sesión 2)
+
+- `T1`+Z mueve el **worm del plunger de cuchilla** (TOOL2 motor) — el worm es autofrenante (no retrocedible a mano). `T0`/TOOL1 sin efecto visible.
+- Con herramienta puesta, `T1`+`G1 Z±2 F150` mueve suave y sin alarma (F1500 alarma — feed del worm limitado).
+- Stall-watchdog del stepper ES el endstop del homing (máquina sin endstops): `limits_set_state` durante homing solo marca el bit (`limits_disable` evita la alarma); fuera de homing lanzaba HARD_LIMIT → **bucle bloqueante = firmware muerto**. Fix c53ed76: ABORT_CYCLE no-bloqueante (ALARM viva, `$X` recupera). VERIFICACIÓN EN MÁQUINA PENDIENTE (test a).
+- Colisión HAL: `MOTOR_X_OCM=2` = `MOTOR_TOOL2_OCM=2` (mismo OC2) — mover X y TOOL2 a la vez se pisa el PWM. Pendiente reasignar pines (decisión del usuario).
+- Sensor 0x44: lecturas fluctúan con luz ambiente; umbrales requieren iluminación controlada.
 
 ## Referencias
 
