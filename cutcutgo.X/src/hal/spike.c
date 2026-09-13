@@ -133,6 +133,54 @@ void spike_init(void)
     printString("[SPIKE] boot\r\n");
 }
 
+static int32_t refl_raw(void)
+{
+    int32_t v = -1;
+
+    if (mark_detector_read(&v) != SENSOR_OK)
+        return -1;
+    return v >> 8;
+}
+
+/* Candidate pins for POWER_TRIGGER (Q7 gate, head illumination rail).
+ * All motor IN pins are excluded (they are fully accounted for by the HAL). */
+typedef struct { const char *n; GPIO_PIN p; } gp_t;
+static const gp_t probes[] = {
+    { "rb15", GPIO_PIN_RB15 }, { "rb2", GPIO_PIN_RB2 }, { "rb3", GPIO_PIN_RB3 },
+    { "rb4", GPIO_PIN_RB4 },   { "rb7", GPIO_PIN_RB7 }, { "rb8", GPIO_PIN_RB8 },
+    { "rb9", GPIO_PIN_RB9 },   { "rd4", GPIO_PIN_RD4 }, { "rd6", GPIO_PIN_RD6 },
+    { "rd7", GPIO_PIN_RD7 },   { "rd10", GPIO_PIN_RD10 }, { "rd13", GPIO_PIN_RD13 },
+    { "rd14", GPIO_PIN_RD14 }, { "rd15", GPIO_PIN_RD15 }, { "rf2", GPIO_PIN_RF2 },
+};
+
+static void probe_sweep(void)
+{
+    uint8_t i;
+    int32_t hi, lo;
+
+    printString("[P] sweep start (idle refl restored high after each)\r\n");
+    for (i = 0; i < sizeof(probes) / sizeof(probes[0]); i++) {
+        GPIO_PinOutputEnable(probes[i].p);
+        GPIO_PinWrite(probes[i].p, true);
+        _delay_ms(120);
+        hi = refl_raw();
+
+        GPIO_PinWrite(probes[i].p, false);
+        _delay_ms(300);
+        lo = refl_raw();
+
+        GPIO_PinWrite(probes[i].p, true);
+        printString("[P] ");
+        printString(probes[i].n);
+        printString(" high=");
+        printInteger(hi);
+        printString(" low=");
+        printInteger(lo);
+        printString("\r\n");
+    }
+    printString("[P] sweep done\r\n");
+}
+
 static void console_exec(char *line)
 {
     char *w[4];
@@ -148,6 +196,11 @@ static void console_exec(char *line)
         return;
 
     if (n == 1 && !strcmp(w[0], "t")) { telemetry(); return; }
+    if (n == 1 && !strcmp(w[0], "p")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        probe_sweep();
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "arm")) {
         a_armed = 1;
         printString("[SPIKE] A ARMED (operator confirms blade raised)\r\n");
