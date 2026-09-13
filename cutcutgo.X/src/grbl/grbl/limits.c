@@ -96,16 +96,12 @@ void limits_set_state(uint8_t axis, bool triggered)
             {
                 if (sys.state != STATE_ALARM) {
                     if (!(sys_rt_exec_alarm)) {
-                      #ifdef HARD_LIMIT_FORCE_STATE_CHECK
-                        // Check limit pin state.
-                        if (limits_get_state()) {
-                          mc_reset(); // Initiate system kill.
-                          system_set_exec_alarm(EXEC_ALARM_HARD_LIMIT); // Indicate hard limit critical event
-                        }
-                      #else
-                        mc_reset(); // Initiate system kill.
-                        system_set_exec_alarm(EXEC_ALARM_HARD_LIMIT); // Indicate hard limit critical event
-                      #endif
+                      /* This limit trigger comes from the encoder stall
+                         watchdog (no endstop pins on this machine): position
+                         truth is intact, so raise a NON-BLOCKING alarm
+                         (ABORT_CYCLE) instead of the critical HARD_LIMIT
+                         loop. Host recovers with '$X'. */
+                      system_set_exec_alarm(EXEC_ALARM_ABORT_CYCLE);
                     }
                 }
             }

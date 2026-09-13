@@ -578,12 +578,8 @@ void st_execute_next_step(void)
                 hal_motor_set_direction(stepper_info.motor_current, HAL_MOTOR_STOP);
                 stepper_info.motor_current->state = HAL_MOTOR_IDLE;
 
-                /* Non-critical alarm: position truth is intact (encoder did
-                   not count, sys_position unchanged). Keep the firmware alive
-                   so the host can unlock with '$X'. A HARD_LIMIT here would
-                   enter the blocking critical loop (firmware dead until
-                   realtime reset). */
-                system_set_exec_alarm(EXEC_ALARM_ABORT_CYCLE);
+                /* Tell GRBL we hit an hard limit. */
+                limits_set_state(stepper_info.motor_current->grbl_axis, true);
 
                 /* No motor is driven. */
                 stepper_info.motor_current = NULL;
