@@ -271,6 +271,20 @@ static void console_exec(char *line)
         channel_dump();
         return;
     }
+    if (n == 3 && !strcmp(w[0], "w")) {
+        long reg = strtol(w[1], 0, 0);
+        long val = strtol(w[2], 0, 0);
+        if (reg < 0 || reg > 0x14 || val < 0 || val > 255) {
+            printString("[SPIKE] ?range\r\n");
+            return;
+        }
+        if (!sensors_isl_write_reg((uint8_t)reg, (uint8_t)val)) {
+            printString("[SPIKE] nack\r\n");
+            return;
+        }
+        printString("[SPIKE] wrote\r\n");
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "s")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         cfg_scan();
