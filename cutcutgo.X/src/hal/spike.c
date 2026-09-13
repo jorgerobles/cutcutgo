@@ -52,6 +52,11 @@ static uint8_t blade_valid;
 
 static void telemetry(void)
 {
+    int32_t refl = -1;
+
+    if (mark_detector_read(&refl) != SENSOR_OK)
+        refl = -1;
+
     printString("[T] x=");
     printInteger(HAL_MOTOR_X.current_steps);
     printString(" y=");
@@ -62,6 +67,8 @@ static void telemetry(void)
     printInteger(HAL_MOTOR_Z2.current_steps);
     printString(" a=");
     printInteger(HAL_MOTOR_A.current_steps);
+    printString(" refl=");
+    printInteger(refl < 0 ? -1 : (refl >> 8));
     printString(" blade=");
     printInteger(blade_valid ? blade_last : -1);
     printString("\r\n");
