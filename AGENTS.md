@@ -61,7 +61,31 @@ motores energizados bloqueados, y posición/calibración persistida con desvío 
 
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
+### Delegation policy (models & agents)
+
+- **Route by judgment**: mechanical jobs (greps, inventories, rename sweeps, log digestion,
+  drafting) go to delegated models; judgment work (ISRs, safety logic, pin decisions, commits)
+  stays with the main model.
+- **ornith (local 9B, `delegate` agent)**: ONE job at a time — memory-bound, never launch
+  parallel ornith agents. Cognition only: never scripts, flashing, or direct writes to the
+  live tree. Parallelize independent verification jobs with other free models (mimo 2.5 free,
+  `general`/`explore` agents).
+- **Prompt shape**: fully mechanical spec — scope dirs, exact patterns, output format, "do not
+  modify files". Demand self-verification in the output (raw vs unique counts reconciled,
+  collision flags). Explicitly list out-of-scope lookalikes (e.g. `PL_COND_ACCESSORY_MASK`,
+  `DC_REDUCTION_*`); renames are whole-identifier, never blind sed.
+- **Verify before acting**: spot-check edit-critical claims with cheap reads. Delegated intel
+  expires when the tree moves — re-sync (codegraph/grep) before each edit batch; never cache
+  line numbers across edits.
+- **codegraph before delegating**: one `codegraph_explore` call returns verbatim source to
+  cross-check delegate claims cheaply.
+- **Tree safety**: delegated file-modifying jobs go in a `git worktree`, never the live tree;
+  the main model applies + verifies + commits. Commits are atomic, gated on Docker `-Werror`
+  build / sim tests, and never delegated. Commit promptly — uncommitted work is invisible to
+  other sessions (check `git status` BEFORE delegating: parallel sessions may have moved the
+  tree ahead of the plan).
+- **Plan drift**: if delegate output changes the plan, update OpenSpec tasks/design
+  immediately — don't let stale tasks persist.
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
