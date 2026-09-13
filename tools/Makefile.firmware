@@ -47,9 +47,6 @@ UF2_BASE   := 0x1d010000
 # 0x70000 = 458752 (decimal: coreutils truncate rejects the 0x prefix).
 # UF2 span now computed dynamically by tools/uf2_slim.py (code end, 4KB-aligned, below NVM page)
 
-SOURCES := $(shell find cutcutgo.X/src -name '*.c' | sort)
-OBJECTS := $(patsubst cutcutgo.X/src/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
-
 CPUFLAGS := -mprocessor=32MX470F512L
 WARNINGS := -Werror -Wall -Wundef -Wshadow -Wpointer-arith -Wbad-function-cast \
             -Wwrite-strings -Waggregate-return -Wstrict-prototypes \
@@ -73,6 +70,21 @@ ifeq ($(BENCH),1)
   BIN       := $(DIST_DIR)/cutcutgo.X.production.bin
   UF2       := $(DIST_DIR)/Cutcutgo_maker1_bootloader_app.uf2
 endif
+
+ifeq ($(SPIKE),1)
+  CFLAGS   += -DMOTOR_SPIKE
+  BUILD_DIR := build/$(CONF)-spike/production
+  DIST_DIR  := dist/$(CONF)-spike/production
+  ELF       := $(DIST_DIR)/cutcutgo.X.production.elf
+  HEX       := $(DIST_DIR)/cutcutgo.X.production.hex
+  MAP       := $(DIST_DIR)/cutcutgo.X.production.map
+  BIN       := $(DIST_DIR)/cutcutgo.X.production.bin
+  UF2       := $(DIST_DIR)/Cutcutgo_maker1_bootloader_app.uf2
+endif
+
+# Variant dirs (bench/spike) must be final before deriving object paths.
+SOURCES := $(shell find cutcutgo.X/src -name '*.c' | sort)
+OBJECTS := $(patsubst cutcutgo.X/src/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
 
 # Per-configuration linker script (standalone vs bootloader layout).
 ifeq ($(CONF),cutcutgo_bl)
@@ -119,7 +131,7 @@ uf2: $(BIN)
 	@echo "UF2 written: $(UF2)"
 
 clean:
-	rm -rf build/$(CONF) dist/$(CONF)
+	rm -rf build/$(CONF)* dist/$(CONF)*
 
 clean-all:
 	rm -rf build dist

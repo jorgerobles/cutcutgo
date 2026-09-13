@@ -57,6 +57,7 @@
 #include "grbl/grbl/grbl.h"
 #include "reset.h"
 #include "hal/debug_probe.h"
+#include "hal/spike.h"
 
 
 // *****************************************************************************
@@ -438,7 +439,10 @@ void APP_Initialize(void)
 
     //serial_init();
     timer_init();
-#ifdef SENSOR_BENCH
+#if defined(MOTOR_SPIKE)
+    serial_init();
+    spike_init();
+#elif defined(SENSOR_BENCH)
     serial_init();
 #else
     led_init();
@@ -471,7 +475,10 @@ void APP_Tasks(void)
 
     if (appData.grblInitialized)
     {
-#ifdef SENSOR_BENCH
+#if defined(MOTOR_SPIKE)
+        /* Bare-metal motor spike: scripted jogs + telemetry, no GRBL. */
+        spike_task();
+#elif defined(SENSOR_BENCH)
         /* Baremetal head-sensor bench: stream bus scan + RGB, no GRBL. */
         debug_bench_task();
 #else
