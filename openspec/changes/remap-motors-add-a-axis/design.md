@@ -33,6 +33,8 @@ See proposal.md for why this is being renamed and brought up now.
 6. **Spike = existing debug firmware path, scripted protocol.** Reuse `debug_probe` (`$DBGMOTOR`, sensor commands) in a `-DDEBUG_PROBE`-style build rather than a throwaway bare-metal binary. Protocol, in order: (a) idle blade-detection baseline; (b) identify Z2 vs A by short jogs (decision 2); (c) rotate A both directions while streaming blade state — pass = no detector stream interruption, no `BLADE:LOSS`, Z position counters untouched; (d) stall watchdog for A validated host-side in the simulator, not by blocking the wormgear on the machine. Rationale: the repo's physical-safety constraint (host-side validation first, minimal supervised machine exposure) and debug_probe already exists.
 7. **Rename ripples into the host simulator.** `tools/sim` stubs mirror HAL names; they are renamed in lockstep so Unity tests keep compiling and blade_ref/sensors/motion tests act as the regression net for the CN-ISR generalization (decision 5).
 
+8. **Blade raised before A rotation (HARD directive from on-machine spike).** Rotating A with the blade down/engaged risks blade, mat and material damage; confirmed on first spike run. Every A motion path (spike sequence, future firmware) gates on a raised-blade state; raise is done via Z2. Operator gets a beep + explicit GO prompt before any motion — never auto-run jogs after flash.
+
 ## Risks / Trade-offs
 
 - [Z2/A pin assignment is actually swapped and verification is skipped or misread] → Decision 2 makes verification a gating task before `config.h` is finalized; jogs are milliseconds-long; findings recorded in `docs/` for review.

@@ -15,6 +15,20 @@ While the A motor is moving, blade detection SHALL continue to operate: detector
 - **WHEN** A rotates at its commanded speed
 - **THEN** only the A motor's encoder counters change; Z1/Z2 encoder counts and system position are unaffected
 
+### Requirement: Blade raised before A rotation (HARD SAFETY)
+The firmware/sequence SHALL never rotate A while the blade is down/engaged: every A motion path SHALL be gated on a verified raised-blade state (raised via Z2 before rotation, confirmed by operator or sensor). Bare-metal spike sequences SHALL raise the blade before any A jog.
+
+#### Scenario: A jog with blade down is rejected
+- **WHEN** an A rotation is requested while the blade is in the down/engaged state
+- **THEN** the motion is refused and the operator is prompted to raise the blade first
+
+### Requirement: Operator beep + confirm before any machine motion (HARD SAFETY)
+Any spike/debug motion sequence SHALL signal the operator audibly (terminal bell) and obtain an explicit GO confirmation immediately before issuing machine motion. Auto-running jog sequences after flash without operator confirmation are forbidden.
+
+#### Scenario: Motion requires beep + explicit GO
+- **WHEN** a debug build is about to move any motor
+- **THEN** the operator hears a beep and must answer an explicit confirmation prompt before the motion starts
+
 ### Requirement: A axis safety envelope
 The A motor SHALL run with a stall watchdog like the other axes, SHALL stop and de-energize on stall or fault, and SHALL honor the global stop/reset paths (feed hold, reset, alarm) available to the rest of the machine.
 
