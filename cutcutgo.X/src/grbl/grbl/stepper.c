@@ -262,13 +262,13 @@ void st_select_tool(uint8_t tool)
     {
         case 1:
         {
-            settings.steps_per_mm[Z_AXIS] = DEFAULT_B_STEPS_PER_MM;
+            settings.steps_per_mm[Z_AXIS] = DEFAULT_Z1_STEPS_PER_MM;
         }
         break;
 
         case 0:
         {
-            settings.steps_per_mm[Z_AXIS] = DEFAULT_A_STEPS_PER_MM;
+            settings.steps_per_mm[Z_AXIS] = DEFAULT_Z2_STEPS_PER_MM;
         }
         break;        
     }
@@ -294,8 +294,8 @@ void st_go_idle()
     //printString("[st_go_idle()]");
     hal_motor_stop(&HAL_MOTOR_X);
     hal_motor_stop(&HAL_MOTOR_Y);
-    hal_motor_stop(&HAL_MOTOR_TOOL1);
-    hal_motor_stop(&HAL_MOTOR_TOOL2);
+    hal_motor_stop(&HAL_MOTOR_Z1);
+    hal_motor_stop(&HAL_MOTOR_Z2);
 }
 
 
@@ -471,17 +471,17 @@ void stepper_init()
     hal_motor_init(&HAL_MOTOR_Y, HAL_MOTOR_PWM);
     
     /* Initialize Z motors. */
-    hal_motor_init(&HAL_MOTOR_TOOL1, HAL_MOTOR_PWM);
-    hal_motor_init(&HAL_MOTOR_TOOL2, HAL_MOTOR_PWM);
+    hal_motor_init(&HAL_MOTOR_Z1, HAL_MOTOR_PWM);
+    hal_motor_init(&HAL_MOTOR_Z2, HAL_MOTOR_PWM);
     
     /* Set default speed. */
     hal_motor_set_speed(&HAL_MOTOR_X, HAL_MOTOR_SPEED_X);
     hal_motor_set_speed(&HAL_MOTOR_Y, HAL_MOTOR_SPEED_Y);
-    hal_motor_set_speed(&HAL_MOTOR_TOOL1, HAL_MOTOR_SPEED_TOOL1);
-    //hal_motor_set_speed(&HAL_MOTOR_TOOL2, HAL_MOTOR_SPEED_TOOL2);
+    hal_motor_set_speed(&HAL_MOTOR_Z1, HAL_MOTOR_SPEED_Z1);
+    //hal_motor_set_speed(&HAL_MOTOR_Z2, HAL_MOTOR_SPEED_Z2);
     
     /* Set default tool. */
-    stepper_info.tool = &HAL_MOTOR_TOOL1;
+    stepper_info.tool = &HAL_MOTOR_Z1;
     
     /* Create timer. */
     stepper_info.timer_slot = timer_create_timer(1, stepper_timer_cb, NULL);
@@ -495,8 +495,8 @@ void stepper_deinit(void)
     hal_motor_deinit(&HAL_MOTOR_Y);
     
     /* Initialize Z motors. */
-    hal_motor_deinit(&HAL_MOTOR_TOOL1);
-    hal_motor_deinit(&HAL_MOTOR_TOOL2);
+    hal_motor_deinit(&HAL_MOTOR_Z1);
+    hal_motor_deinit(&HAL_MOTOR_Z2);
     
     /* Initialize our motor driver. */
     hal_motor_driver_deinit();   
@@ -765,16 +765,16 @@ void st_prep_buffer()
         {
             case 1:
                 {
-                    stepper_info.tool = &HAL_MOTOR_TOOL2;
-                    stepper_info.step_dtz = ceil(1.0/((pl_block->programmed_rate*DEFAULT_A_STEPS_PER_MM) / 60000));
+                    stepper_info.tool = &HAL_MOTOR_Z2;
+                    stepper_info.step_dtz = ceil(1.0/((pl_block->programmed_rate*DEFAULT_Z2_STEPS_PER_MM) / 60000));
                 }
                 break;
 
             case 0:
             default:
                 {
-                    stepper_info.tool = &HAL_MOTOR_TOOL1;
-                    stepper_info.step_dtz = ceil(1.0/((pl_block->programmed_rate*DEFAULT_B_STEPS_PER_MM) / 60000));
+                    stepper_info.tool = &HAL_MOTOR_Z1;
+                    stepper_info.step_dtz = ceil(1.0/((pl_block->programmed_rate*DEFAULT_Z1_STEPS_PER_MM) / 60000));
                 }
                 break;
         }
@@ -799,14 +799,14 @@ void st_prep_buffer()
             }
             else
             {
-                /* TOOL B is inversed. */
+                /* blade Z2 is inversed. */
                 stepper_info.z1 = stepper_info.z1;
                 stepper_info.sz = 1;
             }
         }
         else
         {
-            /* TOOL B is inversed. */
+            /* blade Z2 is inversed. */
             if (selected_tool == 1)
             {
                 stepper_info.z1 = -stepper_info.z1;

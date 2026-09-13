@@ -31,8 +31,8 @@
   // Grbl generic default settings. Should work across different machines.
   #define DEFAULT_X_STEPS_PER_MM 11.76
   #define DEFAULT_Y_STEPS_PER_MM 29.14
-  #define DEFAULT_A_STEPS_PER_MM 11.16
-  #define DEFAULT_B_STEPS_PER_MM 43.26
+  #define DEFAULT_Z2_STEPS_PER_MM 11.16 /* Blade Z (Z2, tool 2). */
+  #define DEFAULT_Z1_STEPS_PER_MM 43.26 /* Marker Z (Z1, tool 1). */
   #define DEFAULT_X_MAX_RATE 1500.0 // mm/min
   #define DEFAULT_Y_MAX_RATE 1500.0 // mm/min
   #define DEFAULT_Z_MAX_RATE 1500.0 // mm/min

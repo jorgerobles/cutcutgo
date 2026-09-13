@@ -323,8 +323,8 @@ void protocol_buffer_synchronize()
   // commanded move so the axes are physically settled before the caller continues.
   while ((hal_motor_get_state(&HAL_MOTOR_X) == HAL_MOTOR_DRIVEN) ||
          (hal_motor_get_state(&HAL_MOTOR_Y) == HAL_MOTOR_DRIVEN) ||
-         (hal_motor_get_state(&HAL_MOTOR_TOOL1) == HAL_MOTOR_DRIVEN) ||
-         (hal_motor_get_state(&HAL_MOTOR_TOOL2) == HAL_MOTOR_DRIVEN)) {
+         (hal_motor_get_state(&HAL_MOTOR_Z1) == HAL_MOTOR_DRIVEN) ||
+         (hal_motor_get_state(&HAL_MOTOR_Z2) == HAL_MOTOR_DRIVEN)) {
     if (sys_rt_exec_state & EXEC_RESET) { return; } // Bail out on a pending reset.
   }
 }

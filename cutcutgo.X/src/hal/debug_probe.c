@@ -532,9 +532,9 @@ uint8_t debug_probe_execute(const char *line)
         hal_motor_driver_t *m = NULL;
         const char *nm = "";
 
-        if (strncmp(s, "T1,", 3) == 0) { m = &HAL_MOTOR_TOOL1; nm = "T1"; s += 3; }
-        else if (strncmp(s, "T2,", 3) == 0) { m = &HAL_MOTOR_TOOL2; nm = "T2"; s += 3; }
-        else if (strncmp(s, "ACC,", 4) == 0) { m = &HAL_MOTOR_ACCESSORY; nm = "ACC"; s += 4; }
+        if (strncmp(s, "Z1,", 3) == 0) { m = &HAL_MOTOR_Z1; nm = "Z1"; s += 3; }
+        else if (strncmp(s, "Z2,", 3) == 0) { m = &HAL_MOTOR_Z2; nm = "Z2"; s += 3; }
+        else if (strncmp(s, "A,", 2) == 0) { m = &HAL_MOTOR_A; nm = "A"; s += 2; }
         else if (strncmp(s, "X,", 2) == 0) { m = &HAL_MOTOR_X; nm = "X"; s += 2; }
         else if (strncmp(s, "Y,", 2) == 0) { m = &HAL_MOTOR_Y; nm = "Y"; s += 2; }
         else

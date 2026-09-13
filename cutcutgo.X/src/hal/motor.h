@@ -1,7 +1,8 @@
 #ifndef __INC_HAL_MOTOR_H
 #define __INC_HAL_MOTOR_H
 
-#include "hal/config.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 #define HAL_MOTOR_SPEED_MAX         800
 #define HAL_MOTOR_SPEED_MIN         2300
@@ -10,8 +11,8 @@
 
 #define HAL_MOTOR_SPEED_X       2000
 #define HAL_MOTOR_SPEED_Y       1500
-#define HAL_MOTOR_SPEED_TOOL1   2100
-#define HAL_MOTOR_SPEED_TOOL2   2000
+#define HAL_MOTOR_SPEED_Z1   2100
+#define HAL_MOTOR_SPEED_Z2   2000
 
 
 typedef enum {
@@ -87,9 +88,9 @@ typedef struct {
 /* Hardware motors declaration (export). */
 extern hal_motor_driver_t HAL_MOTOR_X;
 extern hal_motor_driver_t HAL_MOTOR_Y;
-extern hal_motor_driver_t HAL_MOTOR_TOOL1;
-extern hal_motor_driver_t HAL_MOTOR_TOOL2;
-extern hal_motor_driver_t HAL_MOTOR_ACCESSORY;
+extern hal_motor_driver_t HAL_MOTOR_Z1;
+extern hal_motor_driver_t HAL_MOTOR_Z2;
+extern hal_motor_driver_t HAL_MOTOR_A;
 
 /**
  * Exported functions

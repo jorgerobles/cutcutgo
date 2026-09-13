@@ -32,7 +32,8 @@ BIN       := $(BUILD_DIR)/test_sim
 # REAL firmware sources (explicit list; keep in sync with the seams).
 # Head-sensors port: nvm/eeprom land later with the calibration change;
 # add firmware .c files here as they gain host-testable seams.
-SIM_FW_SRCS  := cutcutgo.X/src/grbl/grbl/blade_ref.c
+SIM_FW_SRCS  := cutcutgo.X/src/grbl/grbl/blade_ref.c \
+                cutcutgo.X/src/hal/motor_encoder.c
 
 # Plant models (host-only physics, tools/sim/plant): DC motor model,
 # quadrature encoder generator, head-sensor models. The plant NEVER
@@ -45,7 +46,9 @@ SIM_PLANT_SRCS := tools/sim/plant/dc_motor.c \
 # the deterministic 1 ms tick loop (future hook point for phases 2-3
 # motion/stall/homing algorithms).
 SIM_HARNESS_SRCS := tools/sim/harness/sim_state.c \
-                    tools/sim/harness/sim_tick.c
+                    tools/sim/harness/sim_tick.c \
+                    tools/sim/harness/sim_limits_stub.c \
+                    tools/sim/harness/sim_motor_stubs.c
 
 # Sim-only sources: runner, registry, vendored Unity.
 SIM_SIM_SRCS := tools/sim/main.c \
@@ -56,7 +59,8 @@ SIM_SIM_SRCS := tools/sim/main.c \
 SIM_TESTS    := tools/sim/tests/test_plant.c \
                 tools/sim/tests/test_motion_smoke.c \
                 tools/sim/tests/test_sensors.c \
-                tools/sim/tests/test_blade_ref.c
+                tools/sim/tests/test_blade_ref.c \
+                tools/sim/tests/test_encoder_dispatch.c
 
 SIM_ALL_SRCS := $(SIM_FW_SRCS) $(SIM_PLANT_SRCS) $(SIM_HARNESS_SRCS) \
                 $(SIM_SIM_SRCS) $(SIM_TESTS)
