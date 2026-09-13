@@ -180,6 +180,62 @@ static void probe_sweep(void)
     printString("[P] sweep done\r\n");
 }
 
+/* Dump every data channel of the head sensor (0x09..0x0E) — blade IR path
+ * may live on a different register than the mark/visible channel 0x0A. */
+static void channel_dump(void)
+{
+    uint8_t r, v;
+    int32_t q;
+
+    printString("[C]");
+    for (r = 0x09; r <= 0x0E; r++) {
+        v = 0;
+        sensors_isl_read_reg(r, &v);
+        printString(" ");
+        printInteger(r);
+        printString("=");
+        printInteger(v);
+    }
+    q = refl_raw();
+    printString(" q16hi=");
+    printInteger(q);
+    printString("\r\n");
+}
+
+/* CFG2 scan: find hidden LED/IR-enable bits. For each accepted value,
+ * dump the max over data channels. */
+static void cfg2_scan(void)
+{
+    uint8_t v, rb, ch, best_ch, mx;
+    int32_t q;
+
+    for (v = 0; v <= 0x3F; v++) {
+        if (!sensors_isl_write_reg(0x02, v))
+            continue;
+        if (!sensors_isl_read_reg(0x02, &rb) || rb != v)
+            continue;
+        _delay_ms(60);
+        best_ch = 0xFF; mx = 0;
+        for (ch = 0x09; ch <= 0x0E; ch++) {
+            uint8_t d = 0;
+            sensors_isl_read_reg(ch, &d);
+            if (d > mx) { mx = d; best_ch = ch; }
+        }
+        q = refl_raw();
+        printString("[S] cfg2=");
+        printInteger(v);
+        printString(" max=");
+        printInteger(mx);
+        printString(" (ch ");
+        printInteger(best_ch);
+        printString(") q=");
+        printInteger(q);
+        printString("\r\n");
+    }
+    sensors_isl_write_reg(0x02, 0x00);
+    printString("[S] scan done, cfg2 restored 0\r\n");
+}
+
 static void console_exec(char *line)
 {
     char *w[4];
@@ -195,6 +251,16 @@ static void console_exec(char *line)
         return;
 
     if (n == 1 && !strcmp(w[0], "t")) { telemetry(); return; }
+    if (n == 1 && !strcmp(w[0], "c")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        channel_dump();
+        return;
+    }
+    if (n == 1 && !strcmp(w[0], "s")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        cfg2_scan();
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "p")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         probe_sweep();

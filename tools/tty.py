@@ -20,8 +20,7 @@ def detect_port(requested):
         return requested
     for pat in ("*cutcutgo*", "*pic32*", "*cdc*"):
         for p in sorted(glob.glob("/dev/serial/by-id/" + pat)):
-            if not re.search(r"if\d+$", p):
-                return p
+            return p
     cands = sorted(glob.glob("/dev/ttyACM*") + glob.glob("/dev/ttyUSB*"))
     if len(cands) == 1:
         return cands[0]
@@ -71,9 +70,9 @@ def cmd_send(args):
     con = Console(detect_port(args.dev))
     deadline = time.time() + args.timeout
     con.drain()
-    con.send_line(args.cmd)
+    con.send_line(args.command)
     if args.echo:
-        print("> " + args.cmd)
+        print("> " + args.command)
     while time.time() < deadline:
         for line in con.read_lines():
             print(line)

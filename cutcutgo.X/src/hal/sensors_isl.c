@@ -171,6 +171,11 @@ static uint8_t isl_read_reg(uint8_t reg, uint8_t *val)
     return 0;
 }
 
+uint8_t sensors_isl_read_reg(uint8_t reg, uint8_t *val)
+{
+    return isl_read_reg(reg, val);
+}
+
 static uint8_t isl_write_reg(uint8_t reg, uint8_t val)
 {
     uint8_t i;
@@ -193,6 +198,12 @@ static uint8_t isl_write_reg(uint8_t reg, uint8_t val)
     }
     return 0;
 }
+
+uint8_t sensors_isl_write_reg(uint8_t reg, uint8_t val)
+{
+    return isl_write_reg(reg, val);
+}
+
 
 static uint8_t isl_configured;
 
