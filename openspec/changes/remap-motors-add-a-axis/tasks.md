@@ -7,9 +7,9 @@
 
 ## 2. Firmware rename (logical, pins unchanged)
 
-- [ ] 2.1 In `hal/config.h`: rename `MOTOR_TOOL1_*` → `MOTOR_Z1_*`, `MOTOR_TOOL2_*` → `MOTOR_Z2_*`, `MOTOR_ACCESSORY_*` → `MOTOR_A_*` (same physical pins), update the header comment block (marker Z / blade Z / blade rotation), add `HAL_MOTOR_SPEED_A` in `hal/motor.h` with a conservative initial value; verify full Docker XC32 build fails only on now-undefined references (expected intermediate state)
-- [ ] 2.2 In `hal/motor.{h,c}`: rename `HAL_MOTOR_TOOL1/TOOL2/ACCESSORY` → `HAL_MOTOR_Z1/Z2/A`, update instances, `hal_motor_lookup_init()`, `grbl_axis` comments (Z1/Z2 both map to `Z_AXIS`, tool-selected), and update `grbl/stepper.c` (`stepper_info.tool` selection uses Z1 (marker, `selected_tool==0`) / Z2 (blade, `selected_tool==1`) with per-tool Z inversion preserved), `grbl/protocol.c` motor-state check, `hal/debug_probe.c` `$DBGMOTOR` names to `Z1`,`Z2`,`A`; verify grep for `TOOL1|TOOL2|ACCESSORY` over `cutcutgo.X/src` returns no hits and full Docker build is `-Werror` clean
-- [ ] 2.3 Commit the rename as one atomic commit and build the artifact; verify `FIRMWARE_<hash>.uf2` produced via Docker toolchain and committed per repo convention
+- [x] 2.1 In `hal/config.h`: rename `MOTOR_TOOL1_*` → `MOTOR_Z1_*`, `MOTOR_TOOL2_*` → `MOTOR_Z2_*`, `MOTOR_ACCESSORY_*` → `MOTOR_A_*` (same physical pins), update the header comment block (marker Z / blade Z / blade rotation), add `HAL_MOTOR_SPEED_A` in `hal/motor.h` with a conservative initial value; verify full Docker XC32 build fails only on now-undefined references (expected intermediate state)
+- [x] 2.2 In `hal/motor.{h,c}`: rename `HAL_MOTOR_TOOL1/TOOL2/ACCESSORY` → `HAL_MOTOR_Z1/Z2/A`, update instances, `hal_motor_lookup_init()`, `grbl_axis` comments (Z1/Z2 both map to `Z_AXIS`, tool-selected), and update `grbl/stepper.c` (`stepper_info.tool` selection uses Z1 (marker, `selected_tool==0`) / Z2 (blade, `selected_tool==1`) with per-tool Z inversion preserved), `grbl/protocol.c` motor-state check, `hal/debug_probe.c` `$DBGMOTOR` names to `Z1`,`Z2`,`A`; verify grep for `TOOL1|TOOL2|ACCESSORY` over `cutcutgo.X/src` returns no hits and full Docker build is `-Werror` clean
+- [x] 2.3 Commit the rename as one atomic commit and build the artifact; verify `FIRMWARE_<hash>.uf2` produced via Docker toolchain and committed per repo convention
 - [ ] 2.4 On-machine supervised sanity: flash rename build, run existing homing + a short pen-draw job, confirm `[BLADE:*]` reports unchanged; verify no behavioral drift vs previous firmware (status report, homing, blade detection baseline)
 
 ## 3. Z2/A pin verification (gates the pin map)
@@ -20,14 +20,14 @@
 
 ## 4. A motor bring-up
 
-- [ ] 4.1 Generalize the encoder change-notification ISR in `hal/motor.c` to dispatch via `ga_motor_lookup` instead of hardcoded `HAL_MOTOR_TOOL1`, preserving the Z-encoder state machine exactly; verify sim encoder-isolation test (1.2) passes with the firmware logic mirrored host-side
-- [ ] 4.2 Initialize A at startup in `grbl/stepper.c` (`hal_motor_init(&HAL_MOTOR_A, HAL_MOTOR_PWM)`, default speed, watchdog threshold) and add A to `hal_motor_safety_checks()`; verify A is idle/de-energized after boot and appears in stall-check walk (debug build inspection)
+- [x] 4.1 Generalize the encoder change-notification ISR in `hal/motor.c` to dispatch via `ga_motor_lookup` instead of hardcoded `HAL_MOTOR_TOOL1`, preserving the Z-encoder state machine exactly; verify sim encoder-isolation test (1.2) passes with the firmware logic mirrored host-side
+- [x] 4.2 Initialize A at startup in `grbl/stepper.c` (`hal_motor_init(&HAL_MOTOR_A, HAL_MOTOR_PWM)`, default speed, watchdog threshold) and add A to `hal_motor_safety_checks()`; verify A is idle/de-energized after boot and appears in stall-check walk (debug build inspection)
 - [ ] 4.3 Verify `$DBGMOTOR=A,CW,<ms>` / `A,CCW,<ms>` move the wormgear on a supervised bench connection; verify stop + de-energize at command end and immediate stop on soft reset; commit bring-up + build `FIRMWARE_<hash>.uf2`
 
 ## 5. Spike: A motion with live blade detection
 
 - [ ] 5.1 Run the spike protocol from design.md decision 6: blade-detection baseline → A rotation both directions while streaming detector state → confirm no stream interruption, no `BLADE:LOSS`, Z counters untouched; verify transcript captured into `docs/` spike note
-- [ ] 5.2 Validate A stall watchdog host-side (sim: block A, exceed threshold, assert stop + de-energize + stall report); verify test added to sim suite and passes
+- [x] 5.2 Validate A stall watchdog host-side (sim: block A, exceed threshold, assert stop + de-energize + stall report); verify test added to sim suite and passes
 - [ ] 5.3 Finalize the `docs/` spike note: confirmed Z2/A pin assignment, A motion observations (direction/speed/encoder counts), blade-detection results, and recommendation for/against promoting A to a full G-code axis; verify note complete per `a-axis-control` spec scenario
 
 ## 6. Closure

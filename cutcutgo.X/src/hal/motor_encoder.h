@@ -26,4 +26,7 @@ void hal_motor_update_encoder_state(hal_motor_driver_t *motor, uint8_t enc_state
 /* Service all registered motor encoders from the port registers. */
 void hal_motor_service_encoders(uint32_t cnstatg, uint32_t portg);
 
+/* Stall watchdog tick: stop + report a driven motor with frozen encoder steps. */
+void hal_motor_stall_detection(hal_motor_driver_t *motor);
+
 #endif /* __INC_HAL_MOTOR_ENCODER_H */

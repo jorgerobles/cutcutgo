@@ -473,12 +473,16 @@ void stepper_init()
     /* Initialize Z motors. */
     hal_motor_init(&HAL_MOTOR_Z1, HAL_MOTOR_PWM);
     hal_motor_init(&HAL_MOTOR_Z2, HAL_MOTOR_PWM);
-    
+
+    /* Initialize A motor (blade-rotation wormgear, not G-code driven). */
+    hal_motor_init(&HAL_MOTOR_A, HAL_MOTOR_PWM);
+
     /* Set default speed. */
     hal_motor_set_speed(&HAL_MOTOR_X, HAL_MOTOR_SPEED_X);
     hal_motor_set_speed(&HAL_MOTOR_Y, HAL_MOTOR_SPEED_Y);
     hal_motor_set_speed(&HAL_MOTOR_Z1, HAL_MOTOR_SPEED_Z1);
     //hal_motor_set_speed(&HAL_MOTOR_Z2, HAL_MOTOR_SPEED_Z2);
+    hal_motor_set_speed(&HAL_MOTOR_A, HAL_MOTOR_SPEED_A);
     
     /* Set default tool. */
     stepper_info.tool = &HAL_MOTOR_Z1;
@@ -497,6 +501,7 @@ void stepper_deinit(void)
     /* Initialize Z motors. */
     hal_motor_deinit(&HAL_MOTOR_Z1);
     hal_motor_deinit(&HAL_MOTOR_Z2);
+    hal_motor_deinit(&HAL_MOTOR_A);
     
     /* Initialize our motor driver. */
     hal_motor_driver_deinit();   

@@ -161,3 +161,51 @@ void hal_motor_service_encoders(uint32_t cnstatg, uint32_t portg)
         }
     }
 }
+
+/** Called every 1ms. */
+
+void hal_motor_stall_detection(hal_motor_driver_t *motor)
+{
+    if (motor->state == HAL_MOTOR_DRIVEN)
+    {
+#if 0
+        if (!motor->wd_armed)
+        {
+            if (motor->current_steps != 0)
+            {
+                /* First pass, keep track of current steps and arm motor watchdog. */
+                motor->wd_prev_steps = motor->current_steps;
+                motor->wd_armed = true;
+
+                /* We are not hitting any hard limit. */
+                limits_set_state(motor->grbl_axis, false);
+            }
+        }
+        else
+#endif
+        if ((motor->current_steps == motor->wd_prev_steps) && motor->wd_armed)
+        {
+            //if (motor->wd_stall_counter < 5)
+            //{
+            //    motor->wd_stall_counter++;
+            //}
+            //else
+            {
+                //printString("motor stalled !\r\n");
+
+                /* Watchdog is armed and motor is stalled. First, cut motor. */
+                hal_motor_set_direction(motor, HAL_MOTOR_STOP);
+                motor->state = HAL_MOTOR_IDLE;
+
+                motor->wd_armed = false;
+
+                /* Tell GRBL we hit an hard limit. */
+                limits_set_state(motor->grbl_axis, true);
+            }
+
+        } else {
+            motor->wd_prev_steps = motor->current_steps;
+            motor->wd_stall_counter = 0;
+        }
+    }
+}

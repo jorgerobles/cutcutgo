@@ -11,8 +11,11 @@
 
 #define HAL_MOTOR_SPEED_X       2000
 #define HAL_MOTOR_SPEED_Y       1500
-#define HAL_MOTOR_SPEED_Z1   2100
-#define HAL_MOTOR_SPEED_Z2   2000
+#define HAL_MOTOR_SPEED_Z1      2100
+#define HAL_MOTOR_SPEED_Z2      2000
+
+/* A axis (blade-rotation wormgear): slow by default, tuned during spike. */
+#define HAL_MOTOR_SPEED_A       2300
 
 
 typedef enum {

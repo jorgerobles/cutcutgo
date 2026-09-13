@@ -149,6 +149,48 @@ static void test_brake_on_command_steps(void)
     TEST_ASSERT_EQUAL_INT(HAL_MOTOR_IDLE, m_a.state);
 }
 
+/* Stall watchdog: frozen encoder steps on a driven, armed motor stop it. */
+static void test_stall_watchdog_stops_blocked_a(void)
+{
+    fixture();
+    /* A driven, armed, blocked: encoder steps frozen at commanded position. */
+    m_a.state = HAL_MOTOR_DRIVEN;
+    m_a.wd_armed = true;
+    m_a.wd_prev_steps = 5;
+    m_a.current_steps = 5;
+    m_a.command_steps = 10;
+
+    hal_motor_stall_detection(&m_a);
+
+    TEST_ASSERT_EQUAL_INT(HAL_MOTOR_IDLE, m_a.state);
+    TEST_ASSERT_FALSE(m_a.wd_armed);
+    TEST_ASSERT_EQUAL_INT(1, sim_motor_dir_calls());
+    TEST_ASSERT_EQUAL_PTR(&m_a, sim_motor_dir_target(0));
+    TEST_ASSERT_EQUAL_INT(HAL_MOTOR_STOP, sim_motor_dir_value(0));
+    /* Stall reported to GRBL on A's axis only. */
+    TEST_ASSERT_EQUAL_INT(1, sim_limits_count());
+    TEST_ASSERT_EQUAL_UINT8(m_a.grbl_axis, sim_limits_axis(0));
+    TEST_ASSERT_TRUE(sim_limits_triggered(0));
+}
+
+/* Progressing motor: watchdog re-arms baseline, no stop, no report. */
+static void test_stall_watchdog_progressing_motor(void)
+{
+    fixture();
+    m_z1.state = HAL_MOTOR_DRIVEN;
+    m_z1.wd_armed = true;
+    m_z1.wd_prev_steps = 5;
+    m_z1.current_steps = 7;
+
+    hal_motor_stall_detection(&m_z1);
+
+    TEST_ASSERT_EQUAL_INT(HAL_MOTOR_DRIVEN, m_z1.state);
+    TEST_ASSERT_TRUE(m_z1.wd_armed);
+    TEST_ASSERT_EQUAL_INT(7, m_z1.wd_prev_steps);
+    TEST_ASSERT_EQUAL_INT(0, sim_motor_dir_calls());
+    TEST_ASSERT_EQUAL_INT(0, sim_limits_count());
+}
+
 __attribute__((constructor)) static void register_test_encoder_dispatch(void)
 {
     sim_register_test("test_a_motion_isolation", test_a_motion_isolation);
@@ -156,4 +198,6 @@ __attribute__((constructor)) static void register_test_encoder_dispatch(void)
     sim_register_test("test_error_injection_isolation", test_error_injection_isolation);
     sim_register_test("test_cnstatg_gating", test_cnstatg_gating);
     sim_register_test("test_brake_on_command_steps", test_brake_on_command_steps);
+    sim_register_test("test_stall_watchdog_stops_blocked_a", test_stall_watchdog_stops_blocked_a);
+    sim_register_test("test_stall_watchdog_progressing_motor", test_stall_watchdog_progressing_motor);
 }
