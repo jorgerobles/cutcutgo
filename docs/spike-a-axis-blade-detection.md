@@ -64,8 +64,8 @@ Criterios de paso:
 
 - **A (RD3/RD11, OCM4) = rotación de hoja (wormgear) CONFIRMADO** — sesión 1: -43.675 enc steps, hoja rotando.
 - **Z2 (RB6/RD5, OCM2) = émbolo/portaherramientas (subir/bajar) CONFIRMADO** — CW = SUBIR.
-- **Calibración Z2**: subida total medida por operador = **7 mm** con ~5.531 enc steps @1800 → **~790 steps/mm** (aprox).
-- **Fin de carrera superior de Z2**: alcanzado tras la subida (~7 mm) — stall mecánico contra tope (worm autofrenante).
+- **Calibración Z2**: sonda 150 ms ≈ **2 mm** (1.715 steps) + lote 3×500 ms ≈ **5 mm** (3.816 steps) = **7 mm totales** (~5.531 steps @1800) → **~790 steps/mm** (aprox, ~1.200 steps/mm nominal en dosis).
+- **Fin de carrera superior de Z2**: total recorrido hasta tope ≈ **7 mm** desde la posición inicial — stall mecánico contra tope (worm autofrenante).
 - **Velocidades**: duty 2300 (SPEED_MIN) NO mueve eje cargado (causa del silencio de `$DBGMOTOR`); 1800-2000 mueve.
 - **Z1 (RF12/RF8)**: encoder cuenta (1.942) pero sin efecto visible reportado (pendiente confirmar).
 - **X**: control positivo OK (jog directo @2000).
