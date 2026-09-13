@@ -33,7 +33,8 @@ typedef struct {
 typedef enum {
     SPIKE_BOOT,
     SPIKE_JOG,
-    SPIKE_STREAM
+    SPIKE_STREAM,
+    SPIKE_G_SPIN
 } spike_state_t;
 
 static spike_state_t spike_state = SPIKE_BOOT;
@@ -46,6 +47,8 @@ static char rx_line[32];
 static uint8_t rx_len;
 static uint8_t a_armed;
 static uint32_t spike_next_ms;
+static uint32_t spike_deadline;
+static int spike_g_k;
 static uint32_t spike_jog_start;
 static uint8_t blade_last;
 static uint8_t blade_valid;
@@ -315,8 +318,6 @@ static void gemini_bench(void)
 {
     static const uint8_t addrs[] = { 0x29, 0x39, 0x44, 0x49, 0x4A, 0x50, 0x52, 0x57 };
     uint8_t i, v12 = 0;
-    uint16_t tcs, g, r, b;
-    int k;
 
     printString("[G] address probe (dec):\r\n");
     for (i = 0; i < sizeof(addrs) / sizeof(addrs[0]); i++) {
@@ -334,26 +335,39 @@ static void gemini_bench(void)
     hal_motor_set_manual(&HAL_MOTOR_A, true);
     hal_motor_set_speed(&HAL_MOTOR_A, 1800);
     hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_DIR_CW);
-    for (k = 0; k < 30; k++) {
-        _delay_ms(40);
-        tcs = reg16(0x14, 0x15);
-        g = reg16(0x09, 0x0A);
-        r = reg16(0x0B, 0x0C);
-        b = reg16(0x0D, 0x0E);
-        printString("[G] ");
-        printInteger(k);
-        printString(" tcs=");
-        printInteger(tcs);
-        printString(" g=");
-        printInteger(g);
-        printString(" r=");
-        printInteger(r);
-        printString(" b=");
-        printInteger(b);
-        printString("\r\n");
+    spike_g_k = 0;
+    spike_deadline = timer_get_ms();
+}
+
+static void gemini_spin_tick(void)
+{
+    uint16_t tcs, g, r, b;
+
+    if ((int32_t)(timer_get_ms() - spike_deadline) < 40)
+        return;
+    spike_deadline = timer_get_ms();
+    tcs = reg16(0x14, 0x15);
+    g = reg16(0x09, 0x0A);
+    r = reg16(0x0B, 0x0C);
+    b = reg16(0x0D, 0x0E);
+    printString("[G] ");
+    printInteger(spike_g_k);
+    printString(" tcs=");
+    printInteger(tcs);
+    printString(" g=");
+    printInteger(g);
+    printString(" r=");
+    printInteger(r);
+    printString(" b=");
+    printInteger(b);
+    printString("\r\n");
+    spike_g_k++;
+    if (spike_g_k >= 30) {
+        hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_STOP);
+        spike_state = SPIKE_STREAM;
+        spike_next_ms = timer_get_ms();
+        printString("[G] bench done\r\n");
     }
-    hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_STOP);
-    printString("[G] bench done\r\n");
 }
 
 static void console_exec(char *line)
@@ -375,6 +389,7 @@ static void console_exec(char *line)
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         if (!a_armed) { printString("[SPIKE] REFUSED: 'G' spins A - 'arm' first (blade raised)\r\n"); return; }
         gemini_bench();
+        spike_state = SPIKE_G_SPIN;
         return;
     }
     if (n == 1 && !strcmp(w[0], "d")) {
@@ -489,6 +504,10 @@ void spike_task(void)
     uint32_t now = timer_get_ms();
 
     console_poll();
+    if (spike_state == SPIKE_G_SPIN) {
+        gemini_spin_tick();
+        return;
+    }
 
     switch (spike_state) {
     case SPIKE_BOOT: {
