@@ -77,6 +77,12 @@ Criterios de paso:
 - **Dirección / velocidad / encoder de A**: `______`
 - **Comportamiento de detección de hoja** al mover A: `______`
 
+## Abiertos (nuevos, sesión 2)
+
+- **Home de A / ambigüedad de fase**: un triángulo da oclusión máxima a 0/120/240° — ¿cómo desambigua la máquina? Hipótesis: (1) amplitud distinta por cara (recubrimiento vs acero), (2) home por flanco de transición (vértice→plano) y no por máximo, (3) referencia de fase del portaherramientas. Experimento previsto: rotar A 360° a Z fija muestreando canales → forma de onda de oclusión real.
+- **LED IR no encontrado**: 33 GPIO + CFG1/CFG2 completos sin enable; soporte Cricut confirma "LED IR propio del detector lateral". Pistas: Q7/POWER_STATE_OUT (pin MCU POWER_TRIGGER no identificado en el esquemático), LED muerto en esta unidad, o pulsado solo en rutinas stock. Ch10 responde a luz ambiente: claro=7, ocluido=3.
+- **Geometría confirmada con fotos**: sensor mira lateral al hueco del portaherramientas B, reflector enfrente, punta de hoja cruza el hueco; engranaje latón superior = eje A.
+
 ## 6. Recomendación
 
 - **¿Promover A a un eje completo de G-code?** `______` (gated sobre la evidencia de
