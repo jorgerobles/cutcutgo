@@ -300,6 +300,62 @@ static void register_dump(void)
     printString("[D] end\r\n");
 }
 
+/* Gemini-claims bench: addresses, TCS3472-style ID reg, and side-by-side
+ * sampling of TCS "CDATA" (0x14/15) vs ISL GREEN (0x09/0x0A) during A spin. */
+static uint16_t reg16(uint8_t lo_reg, uint8_t hi_reg)
+{
+    uint8_t lo = 0, hi = 0;
+
+    sensors_isl_read_reg(lo_reg, &lo);
+    sensors_isl_read_reg(hi_reg, &hi);
+    return (uint16_t)((hi << 8) | lo);
+}
+
+static void gemini_bench(void)
+{
+    static const uint8_t addrs[] = { 0x29, 0x39, 0x44, 0x49, 0x4A, 0x50, 0x52, 0x57 };
+    uint8_t i, v12 = 0;
+    uint16_t tcs, g, r, b;
+    int k;
+
+    printString("[G] address probe (dec):\r\n");
+    for (i = 0; i < sizeof(addrs) / sizeof(addrs[0]); i++) {
+        printString("[G] addr ");
+        printInteger(addrs[i]);
+        printString(" -> ");
+        printString(sensors_isl_probe(addrs[i]) ? "ACK\r\n" : "nack\r\n");
+    }
+    sensors_isl_read_reg(0x12, &v12);
+    printString("[G] reg0x12 (TCS3472 ID claim) = ");
+    printInteger(v12);
+    printString(" (Gemini expects 0x44)\r\n");
+
+    printString("[G] spin sampling: tcs_cdata(0x14/15) vs green(0x09/0A) red blue\r\n");
+    hal_motor_set_manual(&HAL_MOTOR_A, true);
+    hal_motor_set_speed(&HAL_MOTOR_A, 1800);
+    hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_DIR_CW);
+    for (k = 0; k < 30; k++) {
+        _delay_ms(40);
+        tcs = reg16(0x14, 0x15);
+        g = reg16(0x09, 0x0A);
+        r = reg16(0x0B, 0x0C);
+        b = reg16(0x0D, 0x0E);
+        printString("[G] ");
+        printInteger(k);
+        printString(" tcs=");
+        printInteger(tcs);
+        printString(" g=");
+        printInteger(g);
+        printString(" r=");
+        printInteger(r);
+        printString(" b=");
+        printInteger(b);
+        printString("\r\n");
+    }
+    hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_STOP);
+    printString("[G] bench done\r\n");
+}
+
 static void console_exec(char *line)
 {
     char *w[4];
@@ -315,6 +371,12 @@ static void console_exec(char *line)
         return;
 
     if (n == 1 && !strcmp(w[0], "t")) { telemetry(); return; }
+    if (n == 1 && !strcmp(w[0], "G")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        if (!a_armed) { printString("[SPIKE] REFUSED: 'G' spins A - 'arm' first (blade raised)\r\n"); return; }
+        gemini_bench();
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "d")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         register_dump();

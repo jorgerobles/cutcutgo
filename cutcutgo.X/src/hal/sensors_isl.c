@@ -176,6 +176,19 @@ uint8_t sensors_isl_read_reg(uint8_t reg, uint8_t *val)
     return isl_read_reg(reg, val);
 }
 
+/* Raw I2C presence probe at an arbitrary 7-bit address (debug/spike only). */
+uint8_t sensors_isl_probe(uint8_t addr)
+{
+    uint8_t ack;
+
+    i2c_recover();
+    i2c_start();
+    i2c_write_byte((uint8_t)(addr << 1));
+    ack = i2c_read_ack();
+    i2c_stop();
+    return ack;
+}
+
 static uint8_t isl_write_reg(uint8_t reg, uint8_t val)
 {
     uint8_t i;
