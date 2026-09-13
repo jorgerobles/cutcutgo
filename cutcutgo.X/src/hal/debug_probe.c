@@ -3,6 +3,7 @@
 
 #include "hal/debug_probe.h"
 #include "grbl/grbl/grbl.h"
+#include "hal/motor.h"
 
 #define SCL_MASK  (1 << 2) /* RA2 */
 #define SDA_MASK  (1 << 3) /* RA3 */
@@ -420,6 +421,25 @@ static void dbg_sample(uint32_t n)
     printString("[DBG] samp done\r\n");
 }
 
+static void dbg_motor(const char *name, hal_motor_driver_t *m, uint8_t ccw, uint32_t ms)
+{
+    if (ms == 0 || ms > 2000)
+        ms = 500;
+
+    hal_motor_init(m, HAL_MOTOR_PWM);
+    hal_motor_set_manual(m, true);
+    hal_motor_set_direction(m, ccw ? HAL_MOTOR_DIR_CCW : HAL_MOTOR_DIR_CW);
+    hal_motor_set_speed(m, HAL_MOTOR_SPEED_MIN);
+    printString("[DBG] motor ");
+    printString(name);
+    printString(" run\r\n");
+    delay_ms(ms);
+    hal_motor_set_direction(m, HAL_MOTOR_STOP);
+    hal_motor_set_manual(m, false);
+    hal_motor_set_speed(m, HAL_MOTOR_SPEED_MIN);
+    printString("[DBG] motor stop\r\n");
+}
+
 uint8_t debug_probe_execute(const char *line)
 {
     if (strncmp(line, "$DBGI2CW", 8) == 0 && line[8] == '=') {
@@ -503,6 +523,33 @@ uint8_t debug_probe_execute(const char *line)
             }
         }
         dbg_sample(n);
+        return STATUS_OK;
+    }
+    if (strncmp(line, "$DBGMOTOR=", 10) == 0) {
+        const char *s = line + 10;
+        uint8_t ccw = 0;
+        uint32_t ms = 500;
+        hal_motor_driver_t *m = NULL;
+        const char *nm = "";
+
+        if (strncmp(s, "T1,", 3) == 0) { m = &HAL_MOTOR_TOOL1; nm = "T1"; s += 3; }
+        else if (strncmp(s, "T2,", 3) == 0) { m = &HAL_MOTOR_TOOL2; nm = "T2"; s += 3; }
+        else if (strncmp(s, "ACC,", 4) == 0) { m = &HAL_MOTOR_ACCESSORY; nm = "ACC"; s += 4; }
+        else if (strncmp(s, "X,", 2) == 0) { m = &HAL_MOTOR_X; nm = "X"; s += 2; }
+        else if (strncmp(s, "Y,", 2) == 0) { m = &HAL_MOTOR_Y; nm = "Y"; s += 2; }
+        else
+            return STATUS_INVALID_STATEMENT;
+
+        if (strncmp(s, "CCW,", 4) == 0) { ccw = 1; s += 4; }
+        else if (strncmp(s, "CW,", 3) == 0) { s += 3; }
+        else
+            return STATUS_INVALID_STATEMENT;
+
+        while (*s >= '0' && *s <= '9') {
+            ms = ms * 10 + (uint32_t)(*s - '0');
+            s++;
+        }
+        dbg_motor(nm, m, ccw, ms);
         return STATUS_OK;
     }
     return STATUS_INVALID_STATEMENT;
