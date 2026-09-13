@@ -147,9 +147,12 @@ static int32_t refl_raw(void)
 typedef struct { const char *n; GPIO_PIN p; } gp_t;
 static const gp_t probes[] = {
     { "rd8", GPIO_PIN_RD8 },   { "rd9", GPIO_PIN_RD9 },
-    { "rg8", GPIO_PIN_RG8 },   { "rg9", GPIO_PIN_RG9 },
-    { "rg12", GPIO_PIN_RG12 }, { "rg13", GPIO_PIN_RG13 },
-    { "rg14", GPIO_PIN_RG14 }, { "rg15", GPIO_PIN_RG15 },
+    { "re0", GPIO_PIN_RE0 },   { "re1", GPIO_PIN_RE1 },   { "re2", GPIO_PIN_RE2 },
+    { "re3", GPIO_PIN_RE3 },   { "re4", GPIO_PIN_RE4 },   { "re5", GPIO_PIN_RE5 },
+    { "re6", GPIO_PIN_RE6 },   { "re7", GPIO_PIN_RE7 },   { "re8", GPIO_PIN_RE8 },
+    { "re9", GPIO_PIN_RE9 },   { "rc1", GPIO_PIN_RC1 },   { "rc2", GPIO_PIN_RC2 },
+    { "ra4", GPIO_PIN_RA4 },   { "ra5", GPIO_PIN_RA5 },   { "ra6", GPIO_PIN_RA6 },
+    { "ra7", GPIO_PIN_RA7 },
 };
 
 static void probe_sweep(void)
@@ -204,36 +207,48 @@ static void channel_dump(void)
 
 /* CFG2 scan: find hidden LED/IR-enable bits. For each accepted value,
  * dump the max over data channels. */
-static void cfg2_scan(void)
+static void ch_snapshot(uint8_t *best_ch, uint8_t *mx)
 {
-    uint8_t v, rb, ch, best_ch, mx;
-    int32_t q;
+    uint8_t ch, d;
 
-    for (v = 0; v <= 0x3F; v++) {
-        if (!sensors_isl_write_reg(0x02, v))
-            continue;
-        if (!sensors_isl_read_reg(0x02, &rb) || rb != v)
-            continue;
-        _delay_ms(60);
-        best_ch = 0xFF; mx = 0;
-        for (ch = 0x09; ch <= 0x0E; ch++) {
-            uint8_t d = 0;
-            sensors_isl_read_reg(ch, &d);
-            if (d > mx) { mx = d; best_ch = ch; }
-        }
-        q = refl_raw();
-        printString("[S] cfg2=");
-        printInteger(v);
-        printString(" max=");
-        printInteger(mx);
-        printString(" (ch ");
-        printInteger(best_ch);
-        printString(") q=");
-        printInteger(q);
-        printString("\r\n");
+    *best_ch = 0xFF; *mx = 0;
+    for (ch = 0x09; ch <= 0x0E; ch++) {
+        d = 0;
+        sensors_isl_read_reg(ch, &d);
+        if (d > *mx) { *mx = d; *best_ch = ch; }
     }
+}
+
+static void cfg_scan(void)
+{
+    uint16_t v;
+    uint8_t rb, best_ch, mx, reg;
+
+    for (reg = 0; reg < 2; reg++) {
+        printString("[S] --- scanning ");
+        printString(reg ? "CFG1 (restore 0x0D)" : "CFG2 (restore 0x00)");
+        printString(" ---\r\n");
+        for (v = 0; v <= 255; v++) {
+            if (!sensors_isl_write_reg(reg ? 0x01 : 0x02, (uint8_t)v))
+                continue;
+            if (!sensors_isl_read_reg(reg ? 0x01 : 0x02, &rb) || rb != (uint8_t)v)
+                continue;
+            _delay_ms(50);
+            ch_snapshot(&best_ch, &mx);
+            printString("[S] cfg");
+            printInteger(reg + 1);
+            printString("=");
+            printInteger(v);
+            printString(" max=");
+            printInteger(mx);
+            printString(" (ch ");
+            printInteger(best_ch);
+            printString(")\r\n");
+        }
+    }
+    sensors_isl_write_reg(0x01, 0x0D);
     sensors_isl_write_reg(0x02, 0x00);
-    printString("[S] scan done, cfg2 restored 0\r\n");
+    printString("[S] scan done, cfg1=0x0D cfg2=0x00 restored\r\n");
 }
 
 static void console_exec(char *line)
@@ -258,7 +273,7 @@ static void console_exec(char *line)
     }
     if (n == 1 && !strcmp(w[0], "s")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
-        cfg2_scan();
+        cfg_scan();
         return;
     }
     if (n == 1 && !strcmp(w[0], "p")) {
