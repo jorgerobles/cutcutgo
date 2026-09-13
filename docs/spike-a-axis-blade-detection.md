@@ -84,6 +84,10 @@ Criterios de paso:
 - **Geometría de detección real**: al sumergir el portaherramientas, es el COLLAR de agarre (no la punta) lo que cruza la ventana lateral → la firma de detección stock probablemente sea la oclusión del collar con LED IR propio.
 - **Geometría confirmada con fotos**: sensor mira lateral al hueco del portaherramientas B, reflector enfrente, punta de hoja cruza el hueco; engranaje latón superior = eje A.
 
+- **Mapa de registros del chip de cabeza (0x44)**: espacio real de 32 registros (0x00-0x1F), alias módulo 32 por encima; reg1=CFG1, reg2=CFG2 (bits bajos leen como 3), reg6/7=0xFFFF fijo (saturación o constante 16-bit), reg8=7, reg30=0x7D (espejo ID). El receptor IR no aparece en ninguno.
+- **Receptor IR no localizado** (siguiente sesión): no está en niveles estáticos de 14 líneas del ribbon ni en registros I2C. Hipótesis fuerte: salida modulada/frecuencia (fotodiodo inmune a luz ambiente) → hace falta muestreo de transiciones por línea, scope/multímetro en la PCB de cabeza, o las notas de virtualabs.
+- **Emisor IR confirmado vivo y siempre encendido** (foto con cámara de móvil: brillo rosa en el knob superior).
+
 ## 6. Recomendación
 
 - **¿Promover A a un eje completo de G-code?** `______` (gated sobre la evidencia de
