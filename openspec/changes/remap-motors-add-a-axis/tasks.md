@@ -14,7 +14,7 @@
 
 ## 3. Z2/A pin verification (gates the pin map)
 
-- [ ] 3.1 Write the supervised jog procedure (short `$DBGMOTOR` pulses at low ms on the two candidate pin sets) into the spike note skeleton under `docs/` before touching the machine; verify procedure includes abort conditions and per-step expectations
+- [x] 3.1 Write the supervised jog procedure (short `$DBGMOTOR` pulses at low ms on the two candidate pin sets) into the spike note skeleton under `docs/` before touching the machine; verify procedure includes abort conditions and per-step expectations
 - [ ] 3.2 Execute the verification session: jog each candidate set once, record which moves the blade Z carriage vs which spins the wormgear; verify observation is written into `docs/` note with pin sets identified
 - [ ] 3.3 If swapped: swap `MOTOR_Z2_*`/`MOTOR_A_*` pin sets in `hal/config.h`, rebuild, re-jog to confirm; verify commanding Z2 moves the carriage and A spins the wormgear; commit the (possibly empty) pin-map finalization separately
 
@@ -33,4 +33,4 @@
 ## 6. Closure
 
 - [ ] 6.1 Full `-Werror` Docker rebuild + all Unity suites green; verify final `FIRMWARE_<hash>.uf2` committed
-- [ ] 6.2 Add terminology note (TOOL1→Z1, TOOL2→Z2, ACCESSORY→A) to pending changes' docs that reference old names (`head-sensors`, `blade-axis-reference`); verify `openspec validate --strict` passes for this change
+- [x] 6.2 Add terminology note (TOOL1→Z1, TOOL2→Z2, ACCESSORY→A) to pending changes' docs that reference old names (`head-sensors`, `blade-axis-reference`); verify `openspec validate --strict` passes for this change

@@ -1,5 +1,11 @@
 ## Why
 
+> **Terminology update (b1aa622, remap-motors-add-a-axis):** firmware motors renamed
+> TOOL1→`Z1` (marker Z), TOOL2→`Z2` (blade Z), ACCESSORY→`A` (blade-rotation wormgear on the Z2 head).
+> **Discrepancy flagged:** this document identifies the blade motor as TOOL1, while the machine model in
+> `openspec/changes/remap-motors-add-a-axis/` maps blade Z to Z2 (tool 2). Reconcile during the on-hardware
+> pin verification recorded in `docs/spike-a-axis-blade-detection.md` before archiving this change.
+
 The blade/knife motor (Z axis = TOOL1) has no absolute reference: Z homing is stall-only (`limits.c` guesses contact from lost encoder steps) and after power-up or a stall the firmware does not know the current blade position. The head carries two sensing elements — a blade detector and a mark detector — routed through J500 (I2C `SDA_1`/`SCL_1`, `POWER_STATE_OUT`, several `UNKNOWN_*` MCU pins) that are unmapped and unused in this fork. These sensors are the prerequisite for real blade-position knowledge and detector-based blade homing, and equally for the calibration cycle, which is therefore deferred to a follow-up change. Sensors first.
 
 ## What Changes

@@ -1,5 +1,11 @@
 ## Context
 
+> **Terminology update (b1aa622, remap-motors-add-a-axis):** firmware motors renamed
+> TOOL1→`Z1` (marker Z), TOOL2→`Z2` (blade Z), ACCESSORY→`A` (blade-rotation wormgear on the Z2 head).
+> **Discrepancy flagged:** this document identifies the blade motor as TOOL1, while the machine model in
+> `openspec/changes/remap-motors-add-a-axis/` maps blade Z to Z2 (tool 2). Reconcile during the on-hardware
+> pin verification recorded in `docs/spike-a-axis-blade-detection.md` before archiving this change.
+
 CutCutGo is GRBL 1.1 on the Cricut Maker 1 (PIC32MX470F512L @96 MHz, no FPU, no endstops). Z axis is the TOOL1 blade motor (`settings.c` maps `Z_AXIS` to TOOL A steps_per_mm); its only reference today is stall detection in `limits.c` (`sys_position[Z_AXIS] = 0` on assumed contact), so blade position truth is weak after power-up or stalls.
 
 Known hardware (reverse-engineered schematics): J500 head connector carries I2C `SDA_1`/`SCL_1` (MCU RA2/RA3), `POWER_STATE_OUT`, and extra encoder channels; several MCU pins are `UNKNOWN_*`. The carriage hosts a blade detector and an optical mark detector whose exact wiring/protocol are unmapped. Harmony config currently enables only clk/evic/gpio/usb (no I2C driver).

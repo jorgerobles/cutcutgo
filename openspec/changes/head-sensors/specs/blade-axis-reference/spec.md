@@ -1,5 +1,11 @@
 ## ADDED Requirements
 
+> **Terminology update (b1aa622, remap-motors-add-a-axis):** firmware motors renamed
+> TOOL1→`Z1` (marker Z), TOOL2→`Z2` (blade Z), ACCESSORY→`A` (blade-rotation wormgear on the Z2 head).
+> **Discrepancy flagged:** this document identifies the blade motor as TOOL1, while the machine model in
+> `openspec/changes/remap-motors-add-a-axis/` maps blade Z to Z2 (tool 2). Reconcile during the on-hardware
+> pin verification recorded in `docs/spike-a-axis-blade-detection.md` before archiving this change.
+
 ### Requirement: Blade-axis reference cycle
 The firmware SHALL provide an additive extension command that establishes the Z (TOOL1) axis reference by supervised motion toward a debounced blade-detector transition at reduced feedrate within clamped travel, then sets `sys_position[Z_AXIS]` to the recorded reference. The command SHALL be accepted only when idle.
 
