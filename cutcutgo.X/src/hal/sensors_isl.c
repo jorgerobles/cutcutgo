@@ -12,7 +12,7 @@
 #define ISL_REG_CFG2       0x02
 #define ISL_REG_CH_A       0x0A
 #define ISL_ID_VALUE       0x7D
-#define ISL_BLADE_THRESHOLD 100
+#define ISL_BLADE_THRESHOLD 50
 
 static void dly(void)
 {
@@ -228,10 +228,10 @@ static sensor_status_t isl_setup(void)
         return SENSOR_OK;
 
     i2c_recover();
-    if (!isl_write_reg(ISL_REG_CFG1, 0x0D) ||
+    if (!isl_write_reg(ISL_REG_CFG1, 0x05) ||
         !isl_write_reg(ISL_REG_CFG2, 0x00))
         return SENSOR_FAULT;
-    if (!isl_read_reg(ISL_REG_CFG1, &v) || v != 0x0D)
+    if (!isl_read_reg(ISL_REG_CFG1, &v) || v != 0x05)
         return SENSOR_FAULT;
     isl_configured = 1;
     return SENSOR_OK;
@@ -256,11 +256,13 @@ sensor_status_t mark_detector_init(void)
 
 sensor_status_t mark_detector_read(int32_t *value_q16)
 {
-    uint8_t v;
+    uint8_t dummy, v;
     sensor_status_t st = isl_setup();
 
     if (st != SENSOR_OK)
         return st;
+    if (!isl_read_reg(ISL_REG_CH_A - 1, &dummy))
+        return SENSOR_TIMEOUT;
     if (!isl_read_reg(ISL_REG_CH_A, &v))
         return SENSOR_TIMEOUT;
     *value_q16 = (int32_t)v << 8;
@@ -279,11 +281,13 @@ sensor_status_t blade_detector_init(void)
 
 sensor_status_t blade_detector_read(uint8_t *detected)
 {
-    uint8_t v;
+    uint8_t dummy, v;
     sensor_status_t st = isl_setup();
 
     if (st != SENSOR_OK)
         return st;
+    if (!isl_read_reg(ISL_REG_CH_A - 1, &dummy))
+        return SENSOR_TIMEOUT;
     if (!isl_read_reg(ISL_REG_CH_A, &v))
         return SENSOR_TIMEOUT;
     *detected = (v > ISL_BLADE_THRESHOLD) ? 1 : 0;
