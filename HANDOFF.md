@@ -1,7 +1,21 @@
 # HANDOFF — CutCutGo / Cricut Maker 1
 
-Fecha: 2026-09-14 (sesión 3 — remap motores + A axis + spike detección de hoja)
-Estado: firmware **spike** en máquina (no el app normal). `openspec/changes/remap-motors-add-a-axis` en curso (10/17 tareas).
+Fecha: 2026-09-14 (sesión 4 — **encoder angular de A resuelto** + ciclo endstop Z2 + `cap`)
+Estado: firmware **spike** en máquina. Descubrimiento clave: el portahojas tiene un **encoder absoluto óptico** (2 chaflanes pulidos + 2 ranuras) que el ISL29125 lee — algoritmo de homing de A validado en hardware. Pendiente: trasladarlo a GRBL (`blade_home.c`), otra sesión.
+
+---
+
+## SESIÓN 4 (esta) — resumen ejecutivo
+
+1. **El ISL29125 lee un encoder angular absoluto del portahojas.** El holder tiene, a la altura del sensor, dos chaflanes planos pulidos (uno ancho, uno estrecho) y dos ranuras (N/S=ranura, E/W=chaflán). Firma por revolución: base 35 → ranura (dip 7-23) → ~3500 steps → **pico del chaflán ancho (refl 63) = ÍNDICE 0°** → meseta estrecha (bump 39). Periodo ≈ 17350 steps/rev. Span 56 counts (7-63): robusto por umbrales.
+2. **Algoritmo de homing de A validado**: rotar en PULSOS (150-600ms, pausa ~1s) muestreando refl con motor parado → detectar refl<15 (ranura) → detectar refl>55 (chaflán ancho) → 0° = centro del pico. La meseta estrecha verifica sentido. Ver `docs/a-axis-homing-encoder.md`.
+3. **Ciclo endstop de herramienta (Z2)**: subir a stall (tope frame) → bajar lento a stall (collar contra pieza sensor) → refl en fondo = presencia de herramienta → subir. Recorrido total ≈ 6900-7000 encoder steps. Stall detect: jog corto de verificación, dz≤150 = parado.
+4. **A4950 latch térmico**: PWM sostenido (>1-2s) con A atascado/rozando → driver se apaga HASTA power-cycle. Los pulsos cortos con pausa nunca lo disparan. Síntoma: a-delta se congela a mitad de `cap`; solo se recupera desconectando USB.
+5. **Mecánica confirmada (usuario)**: A = tornillo sin fin (autorroscante, imposible girar a mano — normal); Z2 = spur + muelle de retorno (el ciclo endstop comprime el muelle contra el collar).
+6. **Seguridad confirmada empíricamente**: rotar A con la hoja semi-bajada (~2900 steps del tope) → el motor apenas gira (roza collar). NUNCA rotar sin estar en tope stall.
+7. El "decae refl" de los ciclos repetidos era **aliasing** (muestrear la firma angular en fases distintas), no degradación del sensor. Barrido CFG1 completo (`s`): TODAS las configs dan 31-35 → la config no es el limitador; la óptica sí.
+
+---
 
 ## Qué es este proyecto
 
@@ -67,19 +81,27 @@ Consola interactiva por USB (no GRBL, no warmup/homing automático):
 4. La detección stock es el "spin test" (rotar + leer) — pero requiere que el haz cruce algo asimétrico; la hoja fina quizá no lo cruza a esta altura.
 
 ## Estado físico de la máquina (IMPORTANTE)
-- Firmware **spike** flasheado (no el app). Para uso normal reflashear `bin/FIRMWARE_4f82d49.uf2`.
-- Portaherramientas en **TOP** (collar por encima de los knobs, punta cruza knob inferior) — la posición de detección.
-- Hoja **puesta**. A sin rotar. Z2 en ~154 steps del tope (cuidado al subir: sin watchdog en spike, mirar el freeze del encoder).
+- Firmware **spike** flasheado (no el app). Para uso normal reflashear el UF2 del app.
+- Z2 en **tope stall** (0.5-1mm del frame). Hoja encajada, verificada por usuario.
+- A a un ángulo cualquiera de los giros de calibración (a≈-88000 esta sesión). refl base en tope: 35-43.
+- **A puede quedar en latch térmico** si se usa `cap` con PWM sostenido → power-cycle (desconectar USB) para recuperar.
 - Para reflashear: **PAUSE+encendido** → unidad "Cutcutgo" → `tools/flash.sh`.
+
+## Lecciones de tooling serie (dura ganada esta sesión)
+- **Verificar CADA comando serie**: la consola pierde/encola comandos con el stream de telemetría a 10Hz. Ver la línea `[JOG] done` + delta del contador; reintentar si no llega. `tools/tty.py send` es el camino más fiable comando-a-comando.
+- **Protolargos en python**: `python3 -u` (unbuffered) + escribir resultados incrementales a fichero. Un run de 420s con buffer murió y perdió todos los datos (la máquina quedó bien: terminó en subida).
+- **Velocidades PWM (OCxRS) en spike**: MÁS ALTO = MÁS LENTO (duty invertido por cableado slow-decay del A4950; OCxR nunca se escribe, la velocidad toca solo OCxRS). Z2/A calibración: 2200-2300 = lento, 2000 = medio, 1200 = rápido.
 
 ## Pendiente (cambio remap-motors-add-a-axis)
 
 Host-side: DONE (rename, encoder dispatch, A bring-up, tests, builds, UF2). Tareas hardware restantes del OpenSpec: 2.4 sanity, 3.2/3.3 pin-verify Z2/A (hecho implícito por mapa), 4.3 bench A, 5.1/5.3 spike run + findings, 6.1 closure.
 
 Próxima sesión (orden sugerido):
-1. Decidir el impasse del detector (registros altos vs scope vs virtualabs).
-2. Completar tareas OpenSpec restantes + `openspec validate --strict` + archive si procede.
-3. Push a origin (~102 commits locales).
+1. **Trasladar el homing de A a GRBL** (`blade_home.c`): pulsed-rotate + umbrales (ranura<15, pico>55) según `docs/a-axis-homing-encoder.md`. Antes en spike: comando `home_a` que encapsule el algoritmo.
+2. **Ciclo endstop Z2 en firmware** (`blade_home.c` ya tiene la estructura): subir-stall → bajar-stall → refl check → subir. Constantes: travel ≈ 7000 steps, stall dz ≤ 150.
+3. Ajustar umbrales de firma con una rev limpia densa (150ms × 24+).
+4. Push a origin (~110 commits locales).
+5. Completar tareas OpenSpec restantes + validate + archive si procede.
 
 ## Comandos rápidos
 
@@ -96,8 +118,9 @@ docker run --rm -v "$PWD":/work -w /work cutcutgo-builder make -f tools/Makefile
 # Flash (máquina en BL: PAUSE+encendido)
 tools/flash.sh <uf2>
 
-# Consola spike: arm → <motor> cw/ccw <ms> [speed] · c · d · i · p · s · w · G · S · t
+# Consola spike: arm → <motor> cw/ccw <ms> [speed] · c · d · i · p · s · w · G · S · t · cap
 tools/tty.py send "z2 cw 200 1800"
+tools/tty.py send "cap 12000 2200"   # captura encoder+refl, dump CSV al terminar
 ```
 
 ## Referencias
