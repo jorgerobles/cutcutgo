@@ -37,7 +37,8 @@ typedef enum {
     SPIKE_JOG,
     SPIKE_STREAM,
     SPIKE_G_SPIN,
-    SPIKE_S_RUN
+    SPIKE_S_RUN,
+    SPIKE_MUX_RUN
 } spike_state_t;
 
 static spike_state_t spike_state = SPIKE_BOOT;
@@ -64,6 +65,31 @@ static const gp_t s_pins[14] = {
     { "ra4", GPIO_PIN_RA4 },   { "ra5", GPIO_PIN_RA5 },
     { "ra6", GPIO_PIN_RA6 },   { "ra7", GPIO_PIN_RA7 },
 };
+
+/* All free GPIOs (not motor/encoder/I2C/button/LED). Shared by the mux hunt
+ * and the full input-level dump ('i'). */
+static const gp_t free_pins[] = {
+    { "rd7", GPIO_PIN_RD7 },   { "rd8", GPIO_PIN_RD8 },   { "rd9", GPIO_PIN_RD9 },
+    { "rd10", GPIO_PIN_RD10 }, { "rd12", GPIO_PIN_RD12 }, { "rd14", GPIO_PIN_RD14 },
+    { "rd15", GPIO_PIN_RD15 }, { "rd6", GPIO_PIN_RD6 },   { "rd4", GPIO_PIN_RD4 },
+    { "rb12", GPIO_PIN_RB12 }, { "rb14", GPIO_PIN_RB14 }, { "rb15", GPIO_PIN_RB15 },
+    { "rb2", GPIO_PIN_RB2 },   { "rb3", GPIO_PIN_RB3 },   { "rb4", GPIO_PIN_RB4 },
+    { "rb5", GPIO_PIN_RB5 },   { "rb7", GPIO_PIN_RB7 },   { "rb8", GPIO_PIN_RB8 },
+    { "rb9", GPIO_PIN_RB9 },
+    { "ra0", GPIO_PIN_RA0 },   { "ra1", GPIO_PIN_RA1 },
+    { "ra4", GPIO_PIN_RA4 },   { "ra5", GPIO_PIN_RA5 },   { "ra6", GPIO_PIN_RA6 },
+    { "ra7", GPIO_PIN_RA7 },   { "ra9", GPIO_PIN_RA9 },   { "ra10", GPIO_PIN_RA10 },
+    { "ra14", GPIO_PIN_RA14 }, { "ra15", GPIO_PIN_RA15 },
+    { "re0", GPIO_PIN_RE0 },   { "re1", GPIO_PIN_RE1 },   { "re2", GPIO_PIN_RE2 },
+    { "re3", GPIO_PIN_RE3 },   { "re4", GPIO_PIN_RE4 },   { "re5", GPIO_PIN_RE5 },
+    { "re6", GPIO_PIN_RE6 },   { "re7", GPIO_PIN_RE7 },   { "re8", GPIO_PIN_RE8 },
+    { "re9", GPIO_PIN_RE9 },
+    { "rc1", GPIO_PIN_RC1 },   { "rc2", GPIO_PIN_RC2 },   { "rc3", GPIO_PIN_RC3 },
+    { "rc4", GPIO_PIN_RC4 },   { "rc12", GPIO_PIN_RC12 }, { "rc13", GPIO_PIN_RC13 },
+    { "rc14", GPIO_PIN_RC14 }, { "rc15", GPIO_PIN_RC15 },
+    { "rf0", GPIO_PIN_RF0 },   { "rf2", GPIO_PIN_RF2 },
+};
+#define FREE_PIN_COUNT (sizeof(free_pins) / sizeof(free_pins[0]))
 
 static void s_poll(void)
 {
@@ -320,7 +346,7 @@ static void cfg_scan(void)
 
     for (reg = 0; reg < 2; reg++) {
         printString("[S] --- scanning ");
-        printString(reg ? "CFG1 (restore 0x0D)" : "CFG2 (restore 0x00)");
+        printString(reg ? "CFG1 (restore 0x05)" : "CFG2 (restore 0x00)");
         printString(" ---\r\n");
         for (v = 0; v <= 255; v++) {
             if (!sensors_isl_write_reg(reg ? 0x01 : 0x02, (uint8_t)v))
@@ -340,9 +366,9 @@ static void cfg_scan(void)
             printString(")\r\n");
         }
     }
-    sensors_isl_write_reg(0x01, 0x0D);
+    sensors_isl_write_reg(0x01, 0x05);
     sensors_isl_write_reg(0x02, 0x00);
-    printString("[S] scan done, cfg1=0x0D cfg2=0x00 restored\r\n");
+    printString("[S] scan done, cfg1=0x05 cfg2=0x00 restored\r\n");
 }
 
 /* Read every head-ribbon candidate pin as a digital input. The lateral
@@ -351,23 +377,14 @@ static void cfg_scan(void)
 static void input_dump(void)
 {
     uint8_t i;
-    static const gp_t ins[] = {
-        { "rg8", GPIO_PIN_RG8 },   { "rg9", GPIO_PIN_RG9 },
-        { "rg12", GPIO_PIN_RG12 }, { "rg13", GPIO_PIN_RG13 },
-        { "rg14", GPIO_PIN_RG14 }, { "rg15", GPIO_PIN_RG15 },
-        { "rd8", GPIO_PIN_RD8 },   { "rd9", GPIO_PIN_RD9 },
-        { "rb12", GPIO_PIN_RB12 }, { "rb13", GPIO_PIN_RB13 },
-        { "ra4", GPIO_PIN_RA4 },   { "ra5", GPIO_PIN_RA5 },
-        { "ra6", GPIO_PIN_RA6 },   { "ra7", GPIO_PIN_RA7 },
-    };
 
     printString("[I]");
-    for (i = 0; i < sizeof(ins) / sizeof(ins[0]); i++) {
-        GPIO_PinInputEnable(ins[i].p);
+    for (i = 0; i < FREE_PIN_COUNT; i++) {
+        GPIO_PinInputEnable(free_pins[i].p);
         printString(" ");
-        printString(ins[i].n);
+        printString(free_pins[i].n);
         printString("=");
-        printInteger(GPIO_PinRead(ins[i].p) ? 1 : 0);
+        printInteger(GPIO_PinRead(free_pins[i].p) ? 1 : 0);
     }
     printString("\r\n");
 }
@@ -458,6 +475,184 @@ static void gemini_spin_tick(void)
     }
 }
 
+/* Full I2C presence scan (blocking, ~0.5s): print every ACK address in
+ * 0x03..0x77. 0x00 (general call) is deliberately skipped. */
+static void i2c_scan_report(void)
+{
+    int a, n = 0;
+
+    printString("[SCAN]");
+    for (a = 0x03; a <= 0x77; a++) {
+        if (sensors_isl_probe((uint8_t)a)) {
+            printString(" ");
+            printInteger(a);
+            n++;
+        }
+    }
+    if (!n)
+        printString(" (none)");
+    printString("\r\n");
+}
+
+/* Minimal 10-bit ADC driver: sample the free analog channels (RB/RE) to hunt
+ * the blade IR receiver — a phototransistor output is analog, invisible to
+ * the digital input dump ('i'). Manual sample: SAMP=1 → settle → SAMP=0. */
+static void adc_init(void)
+{
+    AD1CON1 = 0;                    /* ASAM=0, SSRC=0 (manual), FORM=0, ON=0 */
+    AD1CON2 = 0;                    /* VCFG=0 (AVdd/AVss) */
+    AD1CON3 = (3 << 0) | (16 << 8); /* ADCS=3 (TAD=8*TCY), SAMC=16 */
+    AD1CSSL = 0;
+    AD1CHS = 0;
+    AD1CON1bits.ON = 1;
+}
+
+static uint16_t adc_read(uint8_t ch)
+{
+    volatile uint32_t d;
+
+    AD1CHS = (uint32_t)ch << 16;    /* CH0SA = channel */
+    AD1CON1bits.SAMP = 1;
+    for (d = 0; d < 4000; d++) { }  /* acquisition settle (high-Z source) */
+    AD1CON1bits.SAMP = 0;
+    for (d = 0; d < 100000; d++) {
+        if (AD1CON1bits.DONE) break;
+    }
+    if (!AD1CON1bits.DONE) {
+        AD1CON1bits.ON = 0;
+        AD1CON1bits.ON = 1;
+    }
+    return (uint16_t)ADC1BUF0;
+}
+
+static void adc_sweep(void)
+{
+    static const struct { const char *n; GPIO_PIN p; uint8_t ch; uint8_t e; } an[] = {
+        { "an0",  GPIO_PIN_RB0,  0,  0 },
+        { "an1",  GPIO_PIN_RB1,  1,  0 },
+        { "an2",  GPIO_PIN_RB2,  2,  0 },
+        { "an3",  GPIO_PIN_RB3,  3,  0 },
+        { "an4",  GPIO_PIN_RB4,  4,  0 },
+        { "an5",  GPIO_PIN_RB5,  5,  0 },
+        { "an7",  GPIO_PIN_RB7,  7,  0 },
+        { "an8",  GPIO_PIN_RB8,  8,  0 },
+        { "an9",  GPIO_PIN_RB9,  9,  0 },
+        { "an14", GPIO_PIN_RB14, 14, 0 },
+        { "an15", GPIO_PIN_RB15, 15, 0 },
+        { "an16", GPIO_PIN_RE0, 16, 1 },
+        { "an17", GPIO_PIN_RE1, 17, 1 },
+        { "an18", GPIO_PIN_RE2, 18, 1 },
+        { "an19", GPIO_PIN_RE3, 19, 1 },
+        { "an21", GPIO_PIN_RE5, 21, 1 },
+        { "an22", GPIO_PIN_RE6, 22, 1 },
+        { "an23", GPIO_PIN_RE7, 23, 1 },
+    };
+    uint8_t i;
+    static uint8_t inited;
+
+    if (!inited) { adc_init(); inited = 1; }
+
+    printString("[A]");
+    for (i = 0; i < sizeof(an) / sizeof(an[0]); i++) {
+        if (an[i].e)
+            ANSELE |= (1u << (an[i].p & 0xF));
+        else
+            ANSELB |= (1u << (an[i].p & 0xF));
+        GPIO_PinInputEnable(an[i].p);
+        printString(" ");
+        printString(an[i].n);
+        printString("=");
+        printInteger(adc_read(an[i].ch));
+    }
+    printString("\r\n");
+}
+
+/* Mux/power-enable hunt (see free_pins[] above): toggle each candidate HIGH
+ * then LOW, re-scanning the whole I2C bus, and report any responder that
+ * appears/disappears vs the baseline (how a POWER_TRIGGER or mux-select pin
+ * would show itself). */
+static uint8_t mux_base[0x78];
+static uint8_t mux_pin;   /* current candidate index */
+static uint8_t mux_phase; /* 0=baseline, 1=HIGH, 2=LOW */
+static uint8_t mux_addr;
+
+static void mux_start(void)
+{
+    memset(mux_base, 0, sizeof(mux_base));
+    mux_phase = 0;
+    mux_addr = 0x03;
+    mux_pin = 0;
+    spike_state = SPIKE_MUX_RUN;
+    printString("[M] mux hunt: baseline scan first, then toggle each pin\r\n");
+}
+
+static void mux_tick(void)
+{
+    uint8_t ack;
+    int a;
+
+    if (mux_phase == 0) {
+        if (mux_addr <= 0x77) {
+            mux_base[mux_addr] = sensors_isl_probe(mux_addr) ? 1 : 0;
+            mux_addr++;
+            return;
+        }
+        printString("[M] baseline:");
+        for (a = 0x03; a <= 0x77; a++)
+            if (mux_base[a]) { printString(" "); printInteger(a); }
+        printString("\r\n");
+        mux_phase = 1;
+        mux_addr = 0x03;
+        GPIO_PinOutputEnable(free_pins[mux_pin].p);
+        GPIO_PinWrite(free_pins[mux_pin].p, true);
+        printString("[M] ");
+        printString(free_pins[mux_pin].n);
+        printString(" HIGH\r\n");
+        return;
+    }
+
+    if (mux_addr <= 0x77) {
+        ack = sensors_isl_probe(mux_addr) ? 1 : 0;
+        if (ack != mux_base[mux_addr]) {
+            printString("[M] ");
+            printString(free_pins[mux_pin].n);
+            printString(mux_phase == 1 ? " HIGH " : " LOW  ");
+            printString("diff addr=");
+            printInteger(mux_addr);
+            printString(" base=");
+            printInteger(mux_base[mux_addr]);
+            printString(" now=");
+            printInteger(ack);
+            printString("\r\n");
+        }
+        mux_addr++;
+        return;
+    }
+
+    if (mux_phase == 1) {
+        mux_phase = 2;
+        mux_addr = 0x03;
+        GPIO_PinWrite(free_pins[mux_pin].p, false);
+        return;
+    }
+
+    GPIO_PinInputEnable(free_pins[mux_pin].p);
+    mux_pin++;
+    if (mux_pin >= FREE_PIN_COUNT) {
+        printString("[M] mux hunt done\r\n");
+        spike_state = SPIKE_STREAM;
+        spike_next_ms = timer_get_ms();
+        return;
+    }
+    mux_phase = 1;
+    mux_addr = 0x03;
+    GPIO_PinOutputEnable(free_pins[mux_pin].p);
+    GPIO_PinWrite(free_pins[mux_pin].p, true);
+    printString("[M] ");
+    printString(free_pins[mux_pin].n);
+    printString(" HIGH\r\n");
+}
+
 static void console_exec(char *line)
 {
     char *w[4];
@@ -490,6 +685,21 @@ static void console_exec(char *line)
         register_dump();
         return;
     }
+    if (n == 1 && !strcmp(w[0], "f")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        i2c_scan_report();
+        return;
+    }
+    if (n == 1 && !strcmp(w[0], "m")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        mux_start();
+        return;
+    }
+    if (n == 1 && !strcmp(w[0], "adc")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        adc_sweep();
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "i")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         input_dump();
@@ -514,6 +724,44 @@ static void console_exec(char *line)
         printString("[SPIKE] wrote\r\n");
         return;
     }
+    if (n == 2 && !strcmp(w[0], "r")) {
+        long reg = strtol(w[1], 0, 0);
+        uint8_t v = 0;
+        if (reg < 0 || reg > 0x3F) {
+            printString("[SPIKE] ?range\r\n");
+            return;
+        }
+        if (!sensors_isl_read_reg((uint8_t)reg, &v)) {
+            printString("[SPIKE] nack\r\n");
+            return;
+        }
+        printString("[R] reg=");
+        printInteger(reg);
+        printString(" val=");
+        printInteger(v);
+        printString("\r\n");
+        return;
+    }
+    if (n == 1 && !strcmp(w[0], "ch")) {
+        uint8_t dummy, v09, v0A;
+        sensors_isl_read_reg(0x0A, &dummy);
+        printString("[CH] pure0A=");
+        printInteger(dummy);
+        sensors_isl_read_reg(0x09, &v09);
+        sensors_isl_read_reg(0x0A, &v0A);
+        printString(" after09:09=");
+        printInteger(v09);
+        printString(" 0A=");
+        printInteger(v0A);
+        sensors_isl_read_reg(0x09, &v09);
+        sensors_isl_read_reg(0x0A, &v0A);
+        printString(" again:09=");
+        printInteger(v09);
+        printString(" 0A=");
+        printInteger(v0A);
+        printString("\r\n");
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "s")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         cfg_scan();
@@ -535,7 +783,7 @@ static void console_exec(char *line)
         return;
     }
 
-    if (n < 3) { printString("[SPIKE] usage: <x|y|z1|z2|a> <cw|ccw> <ms> [speed] | t | arm\r\n"); return; }
+    if (n < 3) { printString("[SPIKE] usage: <x|y|z1|z2|a> <cw|ccw> <ms> [speed] | t | arm | f | m | adc | r <reg>\r\n"); return; }
 
     if      (!strcmp(w[0], "x"))  { m = &HAL_MOTOR_X;  nm = "X";  }
     else if (!strcmp(w[0], "y"))  { m = &HAL_MOTOR_Y;  nm = "Y";  }
@@ -605,6 +853,10 @@ void spike_task(void)
         s_bench_tick();
         return;
     }
+    if (spike_state == SPIKE_MUX_RUN) {
+        mux_tick();
+        return;
+    }
 
     switch (spike_state) {
     case SPIKE_BOOT: {
@@ -628,7 +880,7 @@ void spike_task(void)
         blade_last = 0xFF;
         spike_next_ms = now;
         spike_state = SPIKE_STREAM;
-        printString("[SPIKE] console ready - NO auto motion. cmds: <x|y|z1|z2|a> <cw|ccw> <ms> [speed] | t | arm | disarm\r\n");
+        printString("[SPIKE] console ready - NO auto motion. cmds: <x|y|z1|z2|a> <cw|ccw> <ms> [speed] | t | arm | disarm | f (i2c scan) | m (mux hunt) | adc (adc sweep)\r\n");
     }
     break;
 
@@ -647,6 +899,10 @@ void spike_task(void)
 
     case SPIKE_S_RUN:
         /* handled above via s_bench_tick() */
+        break;
+
+    case SPIKE_MUX_RUN:
+        /* handled above via mux_tick() */
         break;
 
     case SPIKE_STREAM:
