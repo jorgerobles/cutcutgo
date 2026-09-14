@@ -30,11 +30,14 @@ typedef struct {
     uint32_t speed;
 } spike_jog_t;
 
+typedef struct { const char *n; GPIO_PIN p; } gp_t;
+
 typedef enum {
     SPIKE_BOOT,
     SPIKE_JOG,
     SPIKE_STREAM,
-    SPIKE_G_SPIN
+    SPIKE_G_SPIN,
+    SPIKE_S_RUN
 } spike_state_t;
 
 static spike_state_t spike_state = SPIKE_BOOT;
@@ -49,6 +52,92 @@ static uint8_t a_armed;
 static uint32_t spike_next_ms;
 static uint32_t spike_deadline;
 static int spike_g_k;
+static uint32_t s_counts[14];
+static uint8_t s_last[14];
+static uint8_t s_phase;
+static const gp_t s_pins[14] = {
+    { "rg8", GPIO_PIN_RG8 },   { "rg9", GPIO_PIN_RG9 },
+    { "rg12", GPIO_PIN_RG12 }, { "rg13", GPIO_PIN_RG13 },
+    { "rg14", GPIO_PIN_RG14 }, { "rg15", GPIO_PIN_RG15 },
+    { "rd8", GPIO_PIN_RD8 },   { "rd9", GPIO_PIN_RD9 },
+    { "rb12", GPIO_PIN_RB12 }, { "rb13", GPIO_PIN_RB13 },
+    { "ra4", GPIO_PIN_RA4 },   { "ra5", GPIO_PIN_RA5 },
+    { "ra6", GPIO_PIN_RA6 },   { "ra7", GPIO_PIN_RA7 },
+};
+
+static void s_poll(void)
+{
+    uint8_t v;
+    int i;
+
+    for (i = 0; i < 14; i++) {
+        v = GPIO_PinRead(s_pins[i].p) ? 1 : 0;
+        if (v != s_last[i])
+            s_counts[i]++;
+        s_last[i] = v;
+    }
+}
+
+static void s_report(const char *tag)
+{
+    int i;
+
+    printString("[S] ");
+    printString(tag);
+    for (i = 0; i < 14; i++) {
+        printString(" ");
+        printString(s_pins[i].n);
+        printString("=");
+        printInteger(s_counts[i]);
+    }
+    printString("\r\n");
+}
+
+static void s_bench_start(void)
+{
+    uint8_t i;
+
+    for (i = 0; i < 14; i++) {
+        GPIO_PinInputEnable(s_pins[i].p);
+        s_last[i] = GPIO_PinRead(s_pins[i].p) ? 1 : 0;
+        s_counts[i] = 0;
+    }
+    s_phase = 0;
+    spike_deadline = timer_get_ms() + 2000;
+    spike_state = SPIKE_S_RUN;
+    printString("[S] window 1: idle baseline 2s\r\n");
+}
+
+static void s_bench_tick(void)
+{
+    s_poll();
+
+    if ((int32_t)(timer_get_ms() - spike_deadline) < 0)
+        return;
+
+    if (s_phase == 0) {
+        s_report("idle:");
+        hal_motor_set_manual(&HAL_MOTOR_A, true);
+        hal_motor_set_speed(&HAL_MOTOR_A, 1900);
+        hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_DIR_CW);
+        printString("[S] window 2: A spinning 2s\r\n");
+        s_phase = 1;
+        memset(s_counts, 0, sizeof(s_counts));
+        spike_deadline = timer_get_ms() + 2000;
+    } else if (s_phase == 1) {
+        s_report("spin:");
+        hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_STOP);
+        memset(s_counts, 0, sizeof(s_counts));
+        spike_deadline = timer_get_ms() + 2000;
+        printString("[S] window 3: stopped 2s\r\n");
+        s_phase = 2;
+    } else {
+        s_report("stop:");
+        spike_state = SPIKE_STREAM;
+        spike_next_ms = timer_get_ms();
+        printString("[S] bench done\r\n");
+    }
+}
 static uint32_t spike_jog_start;
 static uint8_t blade_last;
 static uint8_t blade_valid;
@@ -147,7 +236,6 @@ static int32_t refl_raw(void)
 
 /* Candidate pins for POWER_TRIGGER (Q7 gate, head illumination rail).
  * All motor IN pins are excluded (they are fully accounted for by the HAL). */
-typedef struct { const char *n; GPIO_PIN p; } gp_t;
 static const gp_t probes[] = {
     { "rd8", GPIO_PIN_RD8 },   { "rd9", GPIO_PIN_RD9 },
     { "re0", GPIO_PIN_RE0 },   { "re1", GPIO_PIN_RE1 },   { "re2", GPIO_PIN_RE2 },
@@ -385,6 +473,11 @@ static void console_exec(char *line)
         return;
 
     if (n == 1 && !strcmp(w[0], "t")) { telemetry(); return; }
+    if (n == 1 && !strcmp(w[0], "S")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        s_bench_start();
+        return;
+    }
     if (n == 1 && !strcmp(w[0], "G")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         if (!a_armed) { printString("[SPIKE] REFUSED: 'G' spins A - 'arm' first (blade raised)\r\n"); return; }
@@ -506,6 +599,10 @@ void spike_task(void)
     console_poll();
     if (spike_state == SPIKE_G_SPIN) {
         gemini_spin_tick();
+        return;
+    }
+    if (spike_state == SPIKE_S_RUN) {
+        s_bench_tick();
         return;
     }
 
