@@ -653,6 +653,54 @@ static void mux_tick(void)
     printString(" HIGH\r\n");
 }
 
+/* Blocking capture: spin A, sample encoder+refl in tight loop at I2C rate.
+ * Ring buffer keeps last CAP_BUF_SIZE samples. Dump CSV when done. */
+#define CAP_BUF_SIZE 2000
+typedef struct { int32_t a; int16_t r; } cap_sample_t;
+static cap_sample_t cap_buf[CAP_BUF_SIZE];
+
+static void cap_run(uint32_t ms, uint32_t speed)
+{
+    uint32_t head = 0, count = 0;
+    uint32_t deadline = timer_get_ms() + ms;
+    int32_t refl;
+
+    hal_motor_init(&HAL_MOTOR_A, HAL_MOTOR_PWM);
+    hal_motor_set_manual(&HAL_MOTOR_A, true);
+    hal_motor_set_speed(&HAL_MOTOR_A, speed);
+    hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_DIR_CW);
+
+    /* Tight loop — no USB/serial processing, pure I2C sampling */
+    while ((int32_t)(timer_get_ms() - deadline) < 0) {
+        refl = -1;
+        mark_detector_read(&refl);
+        cap_buf[head].a = HAL_MOTOR_A.current_steps;
+        cap_buf[head].r = (refl < 0) ? -1 : (refl >> 8);
+        head = (head + 1) % CAP_BUF_SIZE;
+        count++;
+    }
+
+    hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_STOP);
+
+    /* Dump */
+    uint32_t n = count < CAP_BUF_SIZE ? count : CAP_BUF_SIZE;
+    uint32_t start = (count >= CAP_BUF_SIZE) ? head : 0;
+    uint32_t i;
+    printString("[CAP] total=");
+    printInteger(count);
+    printString(" dump=");
+    printInteger(n);
+    printString("\r\na_steps,refl\r\n");
+    for (i = 0; i < n; i++) {
+        uint32_t idx = (start + i) % CAP_BUF_SIZE;
+        printInteger(cap_buf[idx].a);
+        printString(",");
+        printInteger(cap_buf[idx].r);
+        printString("\r\n");
+    }
+    printString("[CAP] done\r\n");
+}
+
 static void console_exec(char *line)
 {
     char *w[4];
@@ -698,6 +746,23 @@ static void console_exec(char *line)
     if (n == 1 && !strcmp(w[0], "adc")) {
         if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
         adc_sweep();
+        return;
+    }
+    if (n >= 2 && !strcmp(w[0], "cap")) {
+        if (spike_state != SPIKE_STREAM) { printString("[SPIKE] busy\r\n"); return; }
+        if (!a_armed) { printString("[SPIKE] REFUSED: cap spins A - 'arm' first (blade raised)\r\n"); return; }
+        ms = strtol(w[1], 0, 10);
+        speed = (n >= 3) ? strtol(w[2], 0, 10) : 50;
+        if (ms < 100) ms = 100;
+        if (ms > 30000) ms = 30000;
+        if (speed < 50) speed = 50;
+        if (speed > 2300) speed = 2300;
+        printString("[CAP] start ");
+        printInteger(ms);
+        printString("ms speed=");
+        printInteger(speed);
+        printString("\r\n");
+        cap_run((uint32_t)ms, (uint32_t)speed);
         return;
     }
     if (n == 1 && !strcmp(w[0], "i")) {
@@ -783,7 +848,7 @@ static void console_exec(char *line)
         return;
     }
 
-    if (n < 3) { printString("[SPIKE] usage: <x|y|z1|z2|a> <cw|ccw> <ms> [speed] | t | arm | f | m | adc | r <reg>\r\n"); return; }
+    if (n < 3) { printString("[SPIKE] usage: <x|y|z1|z2|a> <cw|ccw> <ms> [speed] | t | arm | f | m | adc | r <reg> | cap <ms> [speed]\r\n"); return; }
 
     if      (!strcmp(w[0], "x"))  { m = &HAL_MOTOR_X;  nm = "X";  }
     else if (!strcmp(w[0], "y"))  { m = &HAL_MOTOR_Y;  nm = "Y";  }
