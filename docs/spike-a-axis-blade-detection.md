@@ -105,7 +105,11 @@ Contexto: emisor IR siempre encendido (foto), ISL29125 ve el hueco por GREEN (76
 2. **Pulsos/frecuencia** — los pares "encoder" de J500 son lecturas ópticas del portaherramientas; la señal son transiciones, invisible a un dump de niveles.
 3. **Interacción dinámica** — nunca giramos A mientras leíamos esas líneas.
 
-Bench 'S' en spike.c: sondeo continuo de las 14 líneas candidatas contando CAMBIOS de nivel por pin, en 3 ventanas de 1 s: (a) baseline sin girar, (b) A girando lento (cw @1900), (c) parado. Histograma final. Toda línea con transiciones correlacionadas con el giro = lector IR. Requisito: hoja/key EN el hueco (bajar Z2 a la ventana). Beep + GO, sin pasarse del fin de carrera.
+**Ajuste del operador (más probable: analógico)**: el ADC ya está en el juego — el propio ISL29125 es el lector analógico (GREEN respondió a la llave). Las líneas RG del ribbon son digital-only (diseño = señal digital), así que el test de atribución va ANTES del bench 'S':
+
+TEST DE ATRIBUCIÓN (sin movimiento, sin firmware nuevo): con `c` en marcha — (1) cartulina tapando SOLO la ventana lateral → si GREEN cae, la ruta lateral es el canal verde, confirmado; (2) tapando SOLO la ventana inferior (mark) → si GREEN no cambia, separación limpia de rutas. Con eso: umbrales GREEN para hoja arriba/abajo y rotación de A.
+
+Bench 'S' en spike.c (solo si la atribución falla): sondeo continuo de las 14 líneas candidatas contando CAMBIOS de nivel por pin, en 3 ventanas de 1 s: (a) baseline sin girar, (b) A girando lento (cw @1900), (c) parado. Histograma final. Toda línea con transiciones correlacionadas con el giro = lector IR. Requisito: hoja/key EN el hueco (bajar Z2 a la ventana). Beep + GO, sin pasarse del fin de carrera.
 
 ## 7. Nota sobre inconsistencia preexistente
 
