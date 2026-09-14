@@ -1,0 +1,8 @@
+> S
+[T] [S] window 1: idle baseline 2s
+[S] idle: rg8=0 rg9=0 rg12=0 rg13=0 rg14=0 rg15=0 rd8=0 rd9=0 rb12=0 rb13=0 ra4=0 ra5=0 ra6=0 ra7=0
+[S] window 2: A spinning 2s
+[S] spin: rg8=9143 rg9=9144 rg12=0 rg13=0 rg14=0 rg15=0 rd8=0 rd9=0 rb12=0 rb13=0 ra4=0 ra5=0 ra6=0 ra7=0
+[S] window 3: stopped 2s
+[S] stop: rg8=74 rg9=74 rg12=0 rg13=0 rg14=0 rg15=0 rd8=0 rd9=0 rb12=0 rb13=0 ra4=0 ra5=0 ra6=0 ra7=0
+[S] bench done

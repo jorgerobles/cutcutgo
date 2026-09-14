@@ -111,6 +111,13 @@ TEST DE ATRIBUCIÓN (sin movimiento, sin firmware nuevo): con `c` en marcha — 
 
 Bench 'S' en spike.c (solo si la atribución falla): sondeo continuo de las 14 líneas candidatas contando CAMBIOS de nivel por pin, en 3 ventanas de 1 s: (a) baseline sin girar, (b) A girando lento (cw @1900), (c) parado. Histograma final. Toda línea con transiciones correlacionadas con el giro = lector IR. Requisito: hoja/key EN el hueco (bajar Z2 a la ventana). Beep + GO, sin pasarse del fin de carrera.
 
+## BENCH 'S' RESULTADO (sesión 3): no hay lector oculto en el ribbon
+
+- Idle: 0 transiciones en 14 líneas. A girando: rg8=9143/rg9=9144 (cuadratura del propio A, cuadra con telemetría), resto 0. Parado: rg8/9=74 (coasting del worm).
+- CONCLUSIÓN: la cadena del detector de hoja = emisor IR (siempre on) → reflector/hoja → tubo de luz → ISL29125 canal GREEN → I2C. Las líneas "encoder" del ribbon = encoders de Z1/Z2/A (RG12/13, RG14/15, RG8/9), contabilidad cerrada.
+- Pendiente final: hoja real, bajar Z2 a dosis muestreando GREEN (9,10) — la caída = transición de referencia de hoja; con A girando, medir modulación del triángulo (ambigüedad de fase 0/120/240).
+- Riñón de datos: colgar cartón/llave cambia GREEN pero el COLLAR en inmersión NO (tapaba el emisor, no la vista del receptor).
+
 ## 7. Nota sobre inconsistencia preexistente
 
 Preservada sin cambios en el rename de símbolos (task 3.x):
