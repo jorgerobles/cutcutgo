@@ -23,6 +23,7 @@
 #include "grbl.h"
 #include "config/cutcutgo/peripheral/evic/plib_evic.h"
 #include "hal/debug_probe.h"
+#include "hal/a_home_hal.h"
 #include "blade_home.h"
 
 
@@ -143,8 +144,15 @@ uint8_t system_execute_line(char *line)
   if ( strncmp(line, "$HB", 3) == 0 && line[3] == 0 ) {
     return( blade_home_run() );
   }
+  if ( strncmp(line, "$HA", 3) == 0 && line[3] == 0 ) {
+    return( a_home_hal_run() );
+  }
   if ( strncmp(line, "$BQ", 3) == 0 && line[3] == 0 ) {
     blade_home_report();
+    return( STATUS_OK );
+  }
+  if ( strncmp(line, "$AQ", 3) == 0 && line[3] == 0 ) {
+    a_home_hal_report();
     return( STATUS_OK );
   }
   switch( line[char_counter] ) {
