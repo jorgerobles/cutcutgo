@@ -13,9 +13,9 @@
 #define A_HOME_COOLDOWN_MS   1000
 #define A_HOME_Z2_SETTLE_MS  1500
 #define A_HOME_Z2_RETRACT    400
-#define A_HOME_PULSE_MS      150
+#define A_HOME_PULSE_MS      50
 #define A_SCAN_MAX_STEPS     (17350 + 17350 / 2)
-#define A_SCAN_MAX_PULSES    40
+#define A_SCAN_MAX_PULSES    90
 
 static int32_t ah_last_home;
 static uint8_t ah_last_ok;
@@ -79,10 +79,10 @@ uint8_t a_home_hal_run(void)
         printString("[AHOME:FAULT]\r\n");
         return STATUS_OK;
     }
-    /* Retract ~0.5 mm so the chamfer sits flush with the sensor (the lower
-     * stall + return-spring rebound overshoots slightly), then let it settle. */
-    z2_raise_steps(A_HOME_Z2_RETRACT);
+    /* Let the return spring rebound and settle FIRST, then retract ~0.5 mm
+     * so the chamfer sits flush with the sensor. */
     delay_ms(A_HOME_Z2_SETTLE_MS);
+    z2_raise_steps(A_HOME_Z2_RETRACT);
 
     r = a_home_run(&ah_ctx, &home);
 
@@ -103,7 +103,11 @@ uint8_t a_home_hal_run(void)
         printString("[AHOME:BLADE_DOWN]\r\n");
         return STATUS_OK;
     case A_HOME_ERR_NOTRANS:
-        printString("[AHOME:NOTRANS]\r\n");
+        printString("[AHOME:NOTRANS min=");
+        printInteger((long)a_home_refl_min());
+        printString(" max=");
+        printInteger((long)a_home_refl_max());
+        printString("]\r\n");
         return STATUS_OK;
     case A_HOME_ERR_LATCH:
         printString("[AHOME:LATCH]\r\n");

@@ -22,11 +22,10 @@
 /* Chamfer discrimination: peak width >= this (~49 deg) is the wide chamfer. */
 #define A_HOME_WIDE_MIN_STEPS   2370
 
-/* Pulse timing. SCAN uses coarse pulses to find the slot fast; SEEK/MEASURE
- * use fine pulses so the peak width (~2055 vs ~2685 steps) is resolved. The
- * cooldown is enforced by the firmware pulse callback (thermal-safety). */
-#define A_HOME_PULSE_MS         150
-#define A_HOME_FINE_PULSE_MS    50
+/* Pulse timing. A single fine pulse (~6 deg) keeps the sweep dense enough to
+ * catch the slot and resolve the peak width; the cooldown is enforced by the
+ * firmware pulse callback (thermal-safety). */
+#define A_HOME_PULSE_MS         50
 
 /* Safety. Blade engagement (collar rub) starts ~2900 steps from top; a drift
  * tolerance well below that (500 steps = ~0.63 mm) tolerates the small
@@ -47,10 +46,22 @@ static int32_t ah_abs(int32_t v)
 }
 
 static int32_t ga_drift;
+static int32_t ga_refl_min;
+static int32_t ga_refl_max;
 
 int32_t a_home_drift(void)
 {
     return ga_drift;
+}
+
+int32_t a_home_refl_min(void)
+{
+    return ga_refl_min;
+}
+
+int32_t a_home_refl_max(void)
+{
+    return ga_refl_max;
 }
 
 a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
@@ -68,6 +79,8 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
     start = ctx->read_a_steps();
     z2_start = ctx->read_z2_steps();
     prev_a = start;
+    ga_refl_min = 999;
+    ga_refl_max = -1;
 
     for (;;)
     {
@@ -83,6 +96,10 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
         refl = ctx->read_refl();
         if (refl < 0)
             return A_HOME_ERR_FAULT;
+        if (refl < ga_refl_min)
+            ga_refl_min = refl;
+        if (refl > ga_refl_max)
+            ga_refl_max = refl;
 
         a = ctx->read_a_steps();
 
@@ -130,8 +147,7 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
 
         /* Pulse A forward, then verify the encoder advanced (latch guard). */
         prev_a = ctx->read_a_steps();
-        ctx->pulse(1, (phase == A_HOME_PHASE_SCAN)
-                        ? A_HOME_PULSE_MS : A_HOME_FINE_PULSE_MS);
+        ctx->pulse(1, A_HOME_PULSE_MS);
 
         if (ctx->read_a_steps() == prev_a)
         {
