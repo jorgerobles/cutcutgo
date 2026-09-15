@@ -232,11 +232,13 @@ sensor_status_t mark_detector_init(void)
 
 sensor_status_t mark_detector_read(int32_t *value_q16)
 {
-    uint8_t v;
+    uint8_t dummy, v;
     sensor_status_t st = isl_setup();
 
     if (st != SENSOR_OK)
         return st;
+    if (!isl_read_reg(ISL_REG_CH_A - 1, &dummy))
+        return SENSOR_TIMEOUT;
     if (!isl_read_reg(ISL_REG_CH_A, &v))
         return SENSOR_TIMEOUT;
     *value_q16 = (int32_t)v << 8;
@@ -255,11 +257,13 @@ sensor_status_t blade_detector_init(void)
 
 sensor_status_t blade_detector_read(uint8_t *detected)
 {
-    uint8_t v;
+    uint8_t dummy, v;
     sensor_status_t st = isl_setup();
 
     if (st != SENSOR_OK)
         return st;
+    if (!isl_read_reg(ISL_REG_CH_A - 1, &dummy))
+        return SENSOR_TIMEOUT;
     if (!isl_read_reg(ISL_REG_CH_A, &v))
         return SENSOR_TIMEOUT;
     *detected = (v > ISL_BLADE_THRESHOLD) ? 1 : 0;
