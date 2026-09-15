@@ -22,10 +22,11 @@
 /* Chamfer discrimination: peak width >= this (~49 deg) is the wide chamfer. */
 #define A_HOME_WIDE_MIN_STEPS   2370
 
-/* Pulse timing. A single fine pulse (~6 deg) keeps the sweep dense enough to
- * catch the slot and resolve the peak width; the cooldown is enforced by the
- * firmware pulse callback (thermal-safety). */
-#define A_HOME_PULSE_MS         50
+/* Pulse timing. 150 ms is the shortest reliable pulse for A (motor must move;
+ * session-4 minimum). Finer angular resolution comes from a slower PWM speed
+ * (higher OCxRS), not from shorter pulses. Cooldown enforced by the firmware
+ * pulse callback (thermal-safety). */
+#define A_HOME_PULSE_MS         150
 
 /* Safety. Blade engagement (collar rub) starts ~2900 steps from top; a drift
  * tolerance well below that (500 steps = ~0.63 mm) tolerates the small

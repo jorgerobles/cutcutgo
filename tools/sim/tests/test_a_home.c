@@ -10,7 +10,7 @@
  * advances the encoder by ms * PULSE_RATE steps. */
 
 #define REV         17350
-#define PULSE_RATE  6
+#define PULSE_RATE  2   /* steps per ms: ~300 steps per 150 ms pulse (slow speed) */
 
 #define WIDE_LO    3500
 #define WIDE_HI    6500

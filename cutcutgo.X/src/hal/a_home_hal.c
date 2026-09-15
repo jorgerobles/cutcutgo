@@ -9,13 +9,13 @@
 #include "hal/sensors.h"
 #include "grbl/grbl/grbl.h"
 
-#define A_HOME_PULSE_SPEED   2000
+#define A_HOME_PULSE_SPEED   2200
 #define A_HOME_COOLDOWN_MS   1000
 #define A_HOME_Z2_SETTLE_MS  1500
 #define A_HOME_Z2_RETRACT    400
-#define A_HOME_PULSE_MS      50
+#define A_HOME_PULSE_MS      150
 #define A_SCAN_MAX_STEPS     (17350 + 17350 / 2)
-#define A_SCAN_MAX_PULSES    90
+#define A_SCAN_MAX_PULSES    40
 
 static int32_t ah_last_home;
 static uint8_t ah_last_ok;
