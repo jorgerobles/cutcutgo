@@ -33,7 +33,8 @@ BIN       := $(BUILD_DIR)/test_sim
 # Head-sensors port: nvm/eeprom land later with the calibration change;
 # add firmware .c files here as they gain host-testable seams.
 SIM_FW_SRCS  := cutcutgo.X/src/grbl/grbl/blade_ref.c \
-                cutcutgo.X/src/hal/motor_encoder.c
+                cutcutgo.X/src/hal/motor_encoder.c \
+                cutcutgo.X/src/hal/a_home.c
 
 # Plant models (host-only physics, tools/sim/plant): DC motor model,
 # quadrature encoder generator, head-sensor models. The plant NEVER
@@ -60,7 +61,8 @@ SIM_TESTS    := tools/sim/tests/test_plant.c \
                 tools/sim/tests/test_motion_smoke.c \
                 tools/sim/tests/test_sensors.c \
                 tools/sim/tests/test_blade_ref.c \
-                tools/sim/tests/test_encoder_dispatch.c
+                tools/sim/tests/test_encoder_dispatch.c \
+                tools/sim/tests/test_a_home.c
 
 SIM_ALL_SRCS := $(SIM_FW_SRCS) $(SIM_PLANT_SRCS) $(SIM_HARNESS_SRCS) \
                 $(SIM_SIM_SRCS) $(SIM_TESTS)
