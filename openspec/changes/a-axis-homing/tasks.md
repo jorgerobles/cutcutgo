@@ -1,9 +1,9 @@
 ## 1. Host-side prerequisites (sim first, physical-safety constraint)
 
-- [ ] 1.1 Port the ISL29125 priming fix into `hal/sensors_isl.c`: `mark_detector_read()` and `blade_detector_read()` read reg 0x09 before 0x0A (port of spike commit `28d5272`); verify existing sim sensor suites still pass
-- [ ] 1.2 Land `docs/a-axis-homing-encoder.md` in-tree (from `feat/spike-firmware`); verify it documents the signature, thresholds, and safety constraints
-- [ ] 1.3 Add an A-homing state-machine seam in `hal/a_home.{h,c}` (compile-the-real-code, callback-injected: pulse-move, read-reflectance, read-encoder, read-abort) with states `PRECHECK → SCAN → SLOT → INDEX → VERIFY → DONE/ABORT`
-- [ ] 1.4 Add a host plant model (synthetic optical signature: base 35–43, slot 7–23, index >55, bump 39–47) + Unity suite `tests/test_a_home.c`; verify clean-rev, blocked-optics, frozen-encoder, Z2-drift, and blade-down cases all pass and fail correctly when thresholds are cross-wired
+- [x] 1.1 Port the ISL29125 priming fix into `hal/sensors_isl.c`: `mark_detector_read()` and `blade_detector_read()` read reg 0x09 before 0x0A (port of spike commit `28d5272`); verify existing sim sensor suites still pass
+- [x] 1.2 Land `docs/a-axis-homing-encoder.md` in-tree (from `feat/spike-firmware`); verify it documents the signature, thresholds, and safety constraints
+- [x] 1.3 Add an A-homing state-machine seam in `hal/a_home.{h,c}` (compile-the-real-code, callback-injected: pulse-move, read-reflectance, read-encoder, read-abort) with states `SCAN → SEEK → PEAK` (+ blade-down/abort/latch/drift guards)
+- [x] 1.4 Add a host plant model (synthetic optical signature: slot <15, index >55, base 40) + Unity suite `tests/test_a_home.c`; verify clean-rev, blade-down, notrans, frozen-encoder (latch), Z2-drift, fault, and abort cases pass (36/36 total)
 
 ## 2. Firmware wiring
 
