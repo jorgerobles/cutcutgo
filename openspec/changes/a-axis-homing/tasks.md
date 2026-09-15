@@ -7,14 +7,14 @@
 
 ## 2. Firmware wiring
 
-- [ ] 2.1 Add `$HA` (home A) to `system_execute_line()` and an `$AQ`-style A report (`a_home_report()`); verify `$HA` returns `STATUS_IDLE_ERROR` when not idle
-- [ ] 2.2 Wire the firmware callbacks: pulse-move via `HAL_MOTOR_A` manual mode (speed 2000, 150–600 ms, cooldown ≥1 s), read-reflectance via `mark_detector_read`, read-encoder via `HAL_MOTOR_A` counter, abort on `sys.abort`/reset
-- [ ] 2.3 Enforce the raised-blade precondition: verify Z2 top-stall via a short jog (dz ≤ 150) before any A pulse; refuse with `[AHOME:BLADE_DOWN]` otherwise
-- [ ] 2.4 Report homing result `[AHOME:ok steps=… deg=…]` or a specific error code (NOTRANS/LATCH/DRIFT/BLADE_DOWN); de-energize A on every exit path
+- [x] 2.1 Add `$HA` (home A) to `system_execute_line()` and an `$AQ`-style A report (`a_home_hal_report()`); verify `$HA` returns `STATUS_IDLE_ERROR` when not idle
+- [x] 2.2 Wire the firmware callbacks: pulse-move via `HAL_MOTOR_A` manual mode (speed 2000, 150 ms, cooldown ≥1 s), read-reflectance via `mark_detector_read`, read-encoder via `HAL_MOTOR_A` counter, abort on `sys.abort`/reset
+- [x] 2.3 Enforce the raised-blade precondition: verify Z2 top-stall via a short jog (dz ≤ 150) before any A pulse; refuse with `[AHOME:BLADE_DOWN]` otherwise (reusable `hal/z2_endstop` module)
+- [x] 2.4 Report homing result `[AHOME:ok steps=…]` or a specific error code (BLADE_DOWN/NOTRANS/LATCH/DRIFT/FAULT/ABORT); de-energize A on every exit path
 
 ## 3. Build + artifact
 
-- [ ] 3.1 Full Docker `-Werror` build clean + all Unity suites green; verify `FIRMWARE_<hash>.uf2` committed per repo convention
+- [x] 3.1 Full Docker `-Werror` build clean + all Unity suites green; verify `FIRMWARE_<hash>.uf2` committed per repo convention (`bin/FIRMWARE_babe9f3.uf2`)
 
 ## 4. On-machine supervised validation
 
