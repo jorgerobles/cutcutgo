@@ -128,3 +128,17 @@ void a_home_hal_report(void)
     printInteger((long)ah_last_home);
     printString("]\r\n");
 }
+
+void a_home_hal_refl(void)
+{
+    int32_t refl;
+
+    if (mark_detector_read(&refl) != SENSOR_OK)
+    {
+        printString("[AREFL:FAULT]\r\n");
+        return;
+    }
+    printString("[AREFL:");
+    printInteger((long)(refl >> 8));
+    printString("]\r\n");
+}

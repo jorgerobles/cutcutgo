@@ -19,4 +19,7 @@ uint8_t a_home_hal_run(void);
 /* Print the last A homing result (steps/degrees). */
 void a_home_hal_report(void);
 
+/* Print the raw GREEN reflectance byte (non-motion, for calibration). */
+void a_home_hal_refl(void);
+
 #endif /* __INC_HAL_A_HOME_HAL_H */
