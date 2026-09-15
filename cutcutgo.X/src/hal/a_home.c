@@ -1,23 +1,32 @@
 /**
  * A-axis absolute homing state machine (pure logic; see a_home.h).
+ *
+ * The holder has two slots (N/S) and two polished chamfers (E/W): one WIDE
+ * (5.14 mm, ~55.7 deg = ~2685 steps) = index 0 deg, one NARROW (<=4 mm,
+ * <=~42.7 deg = ~2055 steps). Both chamfers sit ~3500 steps after a slot, so
+ * the slot spacing alone cannot tell them apart: the state machine finds a
+ * slot, then measures the WIDTH of the following reflectance peak and keeps
+ * only the wide one (the narrow chamfer is skipped).
  */
 
 #include "hal/a_home.h"
 
-/* Reflectance signature thresholds (session-4 calibration; tune on-machine). */
-#define A_HOME_SLOT_REFL        15
-#define A_HOME_INDEX_REFL       55
+/* Reflectance signature thresholds (session-4 + on-machine sweep; tune). */
+#define A_HOME_SLOT_REFL        30
+#define A_HOME_INDEX_REFL       70
 
 /* Geometry (encoder steps). */
-#define A_HOME_SLOT_TO_INDEX    3500
 #define A_HOME_STEPS_PER_REV    17350
 #define A_HOME_SCAN_MAX_STEPS   (A_HOME_STEPS_PER_REV + A_HOME_STEPS_PER_REV / 2)
 
-/* Pulse timing. Kept < the narrow-feature width so the slot/index are not
- * skipped between samples; cooldown is enforced by the firmware pulse callback
- * (thermal-safety, A4950 latch). */
+/* Chamfer discrimination: peak width >= this (~49 deg) is the wide chamfer. */
+#define A_HOME_WIDE_MIN_STEPS   2370
+
+/* Pulse timing. SCAN uses coarse pulses to find the slot fast; SEEK/MEASURE
+ * use fine pulses so the peak width (~2055 vs ~2685 steps) is resolved. The
+ * cooldown is enforced by the firmware pulse callback (thermal-safety). */
 #define A_HOME_PULSE_MS         150
-#define A_HOME_FINE_PULSE_MS    100
+#define A_HOME_FINE_PULSE_MS    50
 
 /* Safety. Blade engagement (collar rub) starts ~2900 steps from top; a drift
  * tolerance well below that (500 steps = ~0.63 mm) tolerates the small
@@ -27,9 +36,9 @@
 #define A_HOME_LATCH_LIMIT      5
 
 enum {
-    A_HOME_PHASE_SCAN = 0,
-    A_HOME_PHASE_SEEK = 1,
-    A_HOME_PHASE_PEAK = 2
+    A_HOME_PHASE_SCAN = 0,    /* find a slot */
+    A_HOME_PHASE_SEEK = 1,    /* find the peak start after the slot */
+    A_HOME_PHASE_MEASURE = 2  /* measure peak width; keep wide, skip narrow */
 };
 
 static int32_t ah_abs(int32_t v)
@@ -47,8 +56,8 @@ int32_t a_home_drift(void)
 a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
 {
     int32_t start;
-    int32_t slot = 0;
-    int32_t peak = 0;
+    int32_t peak_start = 0;
+    int32_t peak_end = 0;
     int32_t z2_start;
     int32_t prev_a;
     int32_t refl;
@@ -81,22 +90,17 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
         {
         case A_HOME_PHASE_SCAN:
             if (refl < A_HOME_SLOT_REFL)
-            {
-                slot = a;
                 phase = A_HOME_PHASE_SEEK;
-            }
             else if (ah_abs(a - start) > A_HOME_SCAN_MAX_STEPS)
-            {
                 return A_HOME_ERR_NOTRANS;
-            }
             break;
 
         case A_HOME_PHASE_SEEK:
-            if ((refl > A_HOME_INDEX_REFL) &&
-                (ah_abs(a - slot) >= A_HOME_SLOT_TO_INDEX))
+            if (refl > A_HOME_INDEX_REFL)
             {
-                peak = a;
-                phase = A_HOME_PHASE_PEAK;
+                peak_start = a;
+                peak_end = a;
+                phase = A_HOME_PHASE_MEASURE;
             }
             else if (ah_abs(a - start) > A_HOME_SCAN_MAX_STEPS)
             {
@@ -104,21 +108,30 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
             }
             break;
 
-        case A_HOME_PHASE_PEAK:
+        case A_HOME_PHASE_MEASURE:
             if (refl > A_HOME_INDEX_REFL)
-                peak = a;
+            {
+                peak_end = a;
+            }
             else
             {
-                *home_steps = peak;
-                return A_HOME_OK;
+                int32_t width = peak_end - peak_start;
+
+                if (width >= A_HOME_WIDE_MIN_STEPS)
+                {
+                    *home_steps = peak_start + width / 2;
+                    return A_HOME_OK;
+                }
+                /* Narrow chamfer: skip it, scan for the next slot + peak. */
+                phase = A_HOME_PHASE_SCAN;
             }
             break;
         }
 
         /* Pulse A forward, then verify the encoder advanced (latch guard). */
         prev_a = ctx->read_a_steps();
-        ctx->pulse(1, (phase == A_HOME_PHASE_PEAK)
-                        ? A_HOME_FINE_PULSE_MS : A_HOME_PULSE_MS);
+        ctx->pulse(1, (phase == A_HOME_PHASE_SCAN)
+                        ? A_HOME_PULSE_MS : A_HOME_FINE_PULSE_MS);
 
         if (ctx->read_a_steps() == prev_a)
         {

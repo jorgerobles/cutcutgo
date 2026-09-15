@@ -12,6 +12,7 @@
 #define A_HOME_PULSE_SPEED   2000
 #define A_HOME_COOLDOWN_MS   1000
 #define A_HOME_Z2_SETTLE_MS  1500
+#define A_HOME_Z2_RETRACT    400
 #define A_HOME_PULSE_MS      150
 #define A_SCAN_MAX_STEPS     (17350 + 17350 / 2)
 #define A_SCAN_MAX_PULSES    40
@@ -78,8 +79,9 @@ uint8_t a_home_hal_run(void)
         printString("[AHOME:FAULT]\r\n");
         return STATUS_OK;
     }
-    /* Let the return spring settle (~1 mm rebound) before the A homing, so
-     * the drift monitor starts from the settled reading position. */
+    /* Retract ~0.5 mm so the chamfer sits flush with the sensor (the lower
+     * stall + return-spring rebound overshoots slightly), then let it settle. */
+    z2_raise_steps(A_HOME_Z2_RETRACT);
     delay_ms(A_HOME_Z2_SETTLE_MS);
 
     r = a_home_run(&ah_ctx, &home);
