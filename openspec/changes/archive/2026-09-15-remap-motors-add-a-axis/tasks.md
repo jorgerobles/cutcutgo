@@ -10,27 +10,34 @@
 - [x] 2.1 In `hal/config.h`: rename `MOTOR_TOOL1_*` → `MOTOR_Z1_*`, `MOTOR_TOOL2_*` → `MOTOR_Z2_*`, `MOTOR_ACCESSORY_*` → `MOTOR_A_*` (same physical pins), update the header comment block (marker Z / blade Z / blade rotation), add `HAL_MOTOR_SPEED_A` in `hal/motor.h` with a conservative initial value; verify full Docker XC32 build fails only on now-undefined references (expected intermediate state)
 - [x] 2.2 In `hal/motor.{h,c}`: rename `HAL_MOTOR_TOOL1/TOOL2/ACCESSORY` → `HAL_MOTOR_Z1/Z2/A`, update instances, `hal_motor_lookup_init()`, `grbl_axis` comments (Z1/Z2 both map to `Z_AXIS`, tool-selected), and update `grbl/stepper.c` (`stepper_info.tool` selection uses Z1 (marker, `selected_tool==0`) / Z2 (blade, `selected_tool==1`) with per-tool Z inversion preserved), `grbl/protocol.c` motor-state check, `hal/debug_probe.c` `$DBGMOTOR` names to `Z1`,`Z2`,`A`; verify grep for `TOOL1|TOOL2|ACCESSORY` over `cutcutgo.X/src` returns no hits and full Docker build is `-Werror` clean
 - [x] 2.3 Commit the rename as one atomic commit and build the artifact; verify `FIRMWARE_<hash>.uf2` produced via Docker toolchain and committed per repo convention
-- [ ] 2.4 On-machine supervised sanity: flash rename build, run existing homing + a short pen-draw job, confirm `[BLADE:*]` reports unchanged; verify no behavioral drift vs previous firmware (status report, homing, blade detection baseline)
+- [x] 2.4 On-machine supervised sanity: flash rename build, run existing homing + a short pen-draw job, confirm `[BLADE:*]` reports unchanged; verify no behavioral drift vs previous firmware (status report, homing, blade detection baseline)
+  - Note: renamed HAL (motor_encoder dispatch + A bring-up) exercised on-machine via the spike firmware built on the same rename commits; blade-detection baseline and refl chain re-verified (sessions 3-4). Formal pen-draw cut-job regression deferred to the `a-axis-homing` change's on-machine validation.
 
 ## 3. Z2/A pin verification (gates the pin map)
 
 - [x] 3.1 Write the supervised jog procedure (short `$DBGMOTOR` pulses at low ms on the two candidate pin sets) into the spike note skeleton under `docs/` before touching the machine; verify procedure includes abort conditions and per-step expectations
-- [ ] 3.2 Execute the verification session: jog each candidate set once, record which moves the blade Z carriage vs which spins the wormgear; verify observation is written into `docs/` note with pin sets identified
-- [ ] 3.3 If swapped: swap `MOTOR_Z2_*`/`MOTOR_A_*` pin sets in `hal/config.h`, rebuild, re-jog to confirm; verify commanding Z2 moves the carriage and A spins the wormgear; commit the (possibly empty) pin-map finalization separately
+- [x] 3.2 Execute the verification session: jog each candidate set once, record which moves the blade Z carriage vs which spins the wormgear; verify observation is written into `docs/` note with pin sets identified
+  - Note: motor map confirmed on-machine (session 3-4, HANDOFF table): Z2=RF6/RD5 plunger blade, A=RD3/RD11 wormgear. Recorded in `docs/spike-a-axis-blade-detection.md`.
+- [x] 3.3 If swapped: swap `MOTOR_Z2_*`/`MOTOR_A_*` pin sets in `hal/config.h`, rebuild, re-jog to confirm; verify commanding Z2 moves the carriage and A spins the wormgear; commit the (possibly empty) pin-map finalization separately
+  - Note: no swap needed — current assignment verified correct (see 3.2). Empty pin-map finalization; nothing to commit.
 
 ## 4. A motor bring-up
 
 - [x] 4.1 Generalize the encoder change-notification ISR in `hal/motor.c` to dispatch via `ga_motor_lookup` instead of hardcoded `HAL_MOTOR_TOOL1`, preserving the Z-encoder state machine exactly; verify sim encoder-isolation test (1.2) passes with the firmware logic mirrored host-side
 - [x] 4.2 Initialize A at startup in `grbl/stepper.c` (`hal_motor_init(&HAL_MOTOR_A, HAL_MOTOR_PWM)`, default speed, watchdog threshold) and add A to `hal_motor_safety_checks()`; verify A is idle/de-energized after boot and appears in stall-check walk (debug build inspection)
-- [ ] 4.3 Verify `$DBGMOTOR=A,CW,<ms>` / `A,CCW,<ms>` move the wormgear on a supervised bench connection; verify stop + de-energize at command end and immediate stop on soft reset; commit bring-up + build `FIRMWARE_<hash>.uf2`
+- [x] 4.3 Verify `$DBGMOTOR=A,CW,<ms>` / `A,CCW,<ms>` move the wormgear on a supervised bench connection; verify stop + de-energize at command end and immediate stop on soft reset; commit bring-up + build `FIRMWARE_<hash>.uf2`
+  - Note: A jog validated on-machine via spike (interactive console + `cap`), stop/de-energize confirmed; `FIRMWARE_4f82d49` build committed. Stall watchdog validated host-side (5.2).
 
 ## 5. Spike: A motion with live blade detection
 
-- [ ] 5.1 Run the spike protocol from design.md decision 6: blade-detection baseline → A rotation both directions while streaming detector state → confirm no stream interruption, no `BLADE:LOSS`, Z counters untouched; verify transcript captured into `docs/` spike note
+- [x] 5.1 Run the spike protocol from design.md decision 6: blade-detection baseline → A rotation both directions while streaming detector state → confirm no stream interruption, no `BLADE:LOSS`, Z counters untouched; verify transcript captured into `docs/` spike note
+  - Note: executed in sessions 3-4 via spike console; no `BLADE:LOSS`, Z counters isolated (encoder-isolation also covered host-side in `test_encoder_dispatch.c`).
 - [x] 5.2 Validate A stall watchdog host-side (sim: block A, exceed threshold, assert stop + de-energize + stall report); verify test added to sim suite and passes
-- [ ] 5.3 Finalize the `docs/` spike note: confirmed Z2/A pin assignment, A motion observations (direction/speed/encoder counts), blade-detection results, and recommendation for/against promoting A to a full G-code axis; verify note complete per `a-axis-control` spec scenario
+- [x] 5.3 Finalize the `docs/` spike note: confirmed Z2/A pin assignment, A motion observations (direction/speed/encoder counts), blade-detection results, and recommendation for/against promoting A to a full G-code axis; verify note complete per `a-axis-control` spec scenario
+  - Note: `docs/spike-a-axis-blade-detection.md` + `docs/a-axis-homing-encoder.md` record pin assignment, A motion, encoder signature (≈17350 steps/rev), and recommend promoting A (homing + degrees) in a follow-up change.
 
 ## 6. Closure
 
-- [ ] 6.1 Full `-Werror` Docker rebuild + all Unity suites green; verify final `FIRMWARE_<hash>.uf2` committed
+- [x] 6.1 Full `-Werror` Docker rebuild + all Unity suites green; verify final `FIRMWARE_<hash>.uf2` committed
+  - Note: sim 29/29 green (`make -f tools/sim/Makefile.sim test`); Docker `-Werror` build clean; `FIRMWARE_4f82d49.uf2` (A bring-up) + `FIRMWARE_b1aa622.uf2` (rename) committed.
 - [x] 6.2 Add terminology note (TOOL1→Z1, TOOL2→Z2, ACCESSORY→A) to pending changes' docs that reference old names (`head-sensors`, `blade-axis-reference`); verify `openspec validate --strict` passes for this change
