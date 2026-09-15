@@ -1,93 +1,95 @@
 # HANDOFF — CutCutGo / Cricut Maker 1
 
-Fecha: 2026-09-03 (sesión 2)
-Estado: head-sensors 18/18 + tty-connect 6/6. Firmware en máquina: `bin/FIRMWARE_c53ed76.uf2` (fix de stall NO verificado en máquina — ver bugs residuales).
+Fecha: 2026-09-15 (sesión 5 — **homing de A en GRBL, casi**)
+Estado: homing óptico de A implementado en `develop` (cambio OpenSpec `a-axis-homing`),
+host-validado (sim 37/37) y `-Werror` limpio. Pendiente: validar on-machine — la máquina
+quedó **bloqueada** (pulso de 50 ms demasiado corto) y hay que power-cyclear.
 
-## Qué es este proyecto
+---
 
-Fork de **cutcutgo** de virtualabs: puerto de **GRBL 1.1** al **PIC32MX470F512L** de la Cricut Maker 1.
-Máquina de corte/trazado por GCODE, controlada por USB con senders GRBL estándar.
+## SESIÓN 5 (esta) — resumen ejecutivo
 
-- **Upstream**: https://github.com/virtualabs/cutcutgo
-- **Bootloader**: https://github.com/virtualabs/cutcutgo-bl
-- **Workflow**: OpenSpec (`openspec/changes/`) — cambios: `head-sensors` (activo, 17/18) y `calibration-cycle` (deferido, depende de head-sensors)
+1. **Reorganización de ramas**: spike → `feat/spike-firmware` (3b582db, conserva todo).
+   `develop` = producción (84 commits, hasta 99399fa beep.sh). `main` NO se tocó.
+2. **Archivado `remap-motors-add-a-axis`** (rename Z1/Z2/A + A bring-up); specs
+   `a-axis-control` + `motor-axis-map` sincronizadas a `openspec/specs/`.
+3. **Nuevo cambio `a-axis-homing`** (proposal/specs/design/tasks): homing óptico absoluto
+   de A + eje A real en grados (`N_AXIS=4`). 9/17 tareas.
+4. **Sensor**: portado el priming 0x09→0x0A y **CFG1=0x05** (el spike terminó en 0x05, no
+   0x0D como decía el HANDOFF viejo). `ISL_BLADE_THRESHOLD` 100→50.
+5. **Homing de A en GRBL** (`hal/a_home.c` puro + `hal/a_home_hal.c` + `hal/z2_endstop.c`).
+   Comandos: `$HA` (homing), `$AQ` (reporte), `$ARQ` (refl crudo), `$AS` (barrido),
+   `$ZL`/`$ZR`/`$ZU=<steps>` (bajar/subir/afinar Z2).
+6. **Bug de tooling arreglado**: `tools/tty.py send` usaba `args.cmd` (no existía) →
+   AttributeError. Corregido a `args.command`.
 
-## Estado actual (rama main, ~40 commits locales SIN push)
+## Descubrimientos clave (corrigen el HANDOFF de sesión 4)
 
-### Hecho en esta sesión (head-sensors)
-- **Workflow de planning**: `openspec/changes/head-sensors/` (proposal/design/specs/tasks) y `calibration-cycle` reescrito para consumir head-sensors.
-- **Sim host-side portado a main** desde develop (SIN el rewrite de nvm/eeprom de develop): `tools/sim/` (Unity 2.7.2, plant, harness). Suite: `make -f tools/sim/Makefile.sim test` → **22/22 verde**.
-- **Debug probe**: comandos serie `$DBGI2C` (scan), `$DBGPWR` (pines), `$DBGSAMP=n` (muestreo), `$DBGI2CR=a,r` / `$DBGI2CW=a,r,v` (regs), `$DBGRGB` (lectura sensor). En `hal/debug_probe.c`.
-- **Baremetal bench** (sin GRBL, motores muertos): `make -f tools/Makefile.firmware BENCH=1 CONF=cutcutgo_bl clean build-one uf2` → stream continuo de bus/config/reflectancia. Último: `bin/BENCH_80469ec.uf2`.
-- **Drivers reales**: `hal/sensors.h` + `hal/sensors_isl.c` (ambos detectores sobre el sensor de reflectancia I2C 0x44). Sim: `tools/sim/plant/sensors_sim.c`. Stub eliminado.
-- **Blade reference**: `grbl/grbl/blade_ref.{h,c}` (core puro, testeado en sim) + `blade_home.{h,c}` (glue): comando `$HB`, query `$BQ`, hook tras `$H` con fallback stall + flag degradado, monitor de integridad y reportes `[BLADE:...]`.
-- Docs: `docs/head-detectors.md` (registro de inspección completo).
+- **El chaflán se lee con Z2 BAJADO, no en tope.** En tope refl=35-43 (solo base, sin
+  pico). La firma angular (slot<30, pico>70) se lee con Z2 en el stall inferior + rebote
+  del muelle + **retract de 400 steps (0.5 mm)**. Sin bajar, el `$HA` da NOTRANS.
+- **Geometría del chaflán (calibre D=11, ancho=5.14)**: chaflán ancho = **55.7° (~2685
+  steps)**, chaflán estrecho ≤4mm = **≤42.7° (~2055 steps)**. `steps/grado = 48.19`
+  (17350/rev). 0° = centro del chaflán ancho.
+- **No es trivial distinguir ancho/estrecho**: N/S (ranuras) y E/W (chaflanes) están a
+  180°, así que desde cualquier ranura hay un chaflán a ~3500 steps. El discriminador es
+  la **anchura del pico** (umbral ~2370 steps ≈ 49°), no el espaciado.
+- **Umbrales actuales (calibración actual, desplazados de sesión 4)**: ranura <30
+  (medido 19), índice >70 (medido 83-95). La sesión 4 decía 15/55 — no valen aquí.
+- **Barrido**: 50 ms NO mueve A (mínimo fiable ~150 ms). 150 ms@2000 = ~900 steps (muy
+  grueso para discriminar anchura). Solución: **velocidad 2200 (más lenta)** a 150 ms.
 
-### Hallazgos de hardware (detalle en docs/head-detectors.md)
-- **Sensor**: esclavo I2C en **0x44** (ID reg0 = 0x7D), variante NO estándar de ISL29125: registros 0x09-0x0E son **canales de 8 bits independientes** (no pares RGB 16-bit); CFG2=0x3F NACKea; CFG1=0x05 rompe lecturas.
-- **Config que funciona**: CFG1=0x0D, CFG2=0x00. Canal de reflectancia: **reg 0x0A** (negro ≈ 0x13, rojo ≈ 0x2F, verde ≈ 0x57-0x67, linterna → satura).
-- **I2C crítico**: bit-bang **open-drain con espera de clock-stretch y a ~10 kHz** (dly 2400). A 100 kHz los ACKs son no deterministas. Retry x2 + bus recover (9 pulsos SCL) en cada op.
-- **Iluminación REQUERIDA**: no se encontró iluminador en el head (RD7/8/9 ciclados LOW sin efecto). Luz ambiente bajo el cabezal insuficiente → para calibrar/detectar hace falta **fuente de luz fija externa**. OPEN.
-- Z axis = TOOL1 (motor cuchilla); homing actual: stall-only en `limits.c`.
-- develop = fase 1 GSD (NVM+sim) SIN merges de main — no tocar sin plan (decisión del usuario).
+## Estado físico de la máquina (IMPORTANTE)
 
-## Pendiente
+- **BLOQUEADA**: el último `$HA` (firmware 5fdb3d5 con pulso 50 ms) dejó el main loop
+  colgado (A apenas gira en 50 ms). **No responde a serial** → power-cycle
+  (desconectar/reconectar USB).
+- Último firmware flasheado: `5fdb3d5` (malo). **Corregido pero SIN flashear**:
+  `FIRMWARE_3e571fe.uf2` (150 ms + velocidad 2200 + settle-antes-retract).
 
-1. **BUGS RESIDUALES de firmware (prioridad, requiere sesión con bancada)**:
-   - a) Fix de stall alarm (c53ed76: ABORT_CYCLE no-bloqueante) NO verificado en máquina. Test: con herramienta FUERA, `T1`+`G1 Z2 F150` → esperado `ALARM:9` + firmware vivo + `$X` desbloquea.
-   - b) Unlock ($X) durante warmup interrumpido → reanuda en bucle `<Run>` congelado (MPos 0).
-   - c) ctrl-X (0x18) en ese estado → firmware no-responsivo total (solo power cycle).
-   - d) Boot con herramienta FUERA → warmup homing en bucle infinito (el encoder de TOOL2 engrana con la herramienta). Restricción operativa: nunca reiniciar sin herramienta cepada.
-2. **Mapeo de canales de motor** (`$DBGMOTOR=ch,dir,ms` ya implementado en firmware `fad0d2d+`): probar `ACC,CW,500` → ¿gira el engranaje del cuchillo? HAL tiene 5 canales: X, Y, TOOL1(=T0, sin efecto visible), TOOL2(=T1, **worm del plunger de cuchilla**, OCM2 ¡conflicto con X!), ACCESSORY (sin ruta G-code).
-3. **Iluminación**: sensor 0x44 requiere luz externa fija (no se encontró iluminador en head; RD7/8/9 descartados). LED-hunt por registros del esclavo 0x44 a medias (bench `BENCH_33566cd`).
-4. **Change `calibration-cycle`** (deferido): artifacts listos; añadir decisión de iluminación/umbral blade.
-5. **Push a origin**: ~55 commits locales en main.
+## Qué está hecho (todo en `develop`, commiteado)
 
-## Comandos
+| Commit | Qué |
+|---|---|
+| `d9e5156` | archiva remap-motors-add-a-axis |
+| `d63cec4` | crea cambio a-axis-homing |
+| `0476975` | priming 0x09→0x0A |
+| `d4d4cba` | CFG1 0x05 + SEEK scan-limit (fix loop infinito) |
+| `babe9f3` | wiring $HA/$AQ + z2_endstop + a_home_hal |
+| `e9e1b10` | baja Z2 a stall antes de rotar A |
+| `1a09139` | discriminación ancho/estrecho por anchura de pico + retract 400 |
+| `5fdb3d5` | barrido 50ms (DESCARTADO) + settle-antes-retract + diag NOTRANS |
+| `3e571fe` | 150 ms + velocidad 2200 (resolución fina) |
+| `8df1dde` | fix tty.py |
+
+## Próxima sesión (orden sugerido)
+
+1. **Power-cycle** la máquina → BL (PAUSE+encendido) → `tools/flash.sh bin/FIRMWARE_3e571fe.uf2`.
+2. **Verificar posición de lectura**: `$ZL` → esperar rebote → `$ZU=400` → `$AS` (debe
+   dar span~76: min~19 ranura, max~95 pico).
+3. **`$HA`** (beep + GO): debe devolver `[AHOME:ok steps=...]`. Si NOTRANS, el diag
+   ahora imprime `min/max` de refl.
+4. **Medir steps/pulso a velocidad 2200**: `$AS` y comparar samples vs 1.5 rev.
+5. **Verificar umbral de anchura (2370) on-machine**: el pico de refl puede no abarcar
+   los 55.7° geométricos (reflexión especular). Alternativa: discriminar por **altura**
+   del pico (ancho ~95 vs estrecho ~60?) si la anchura no resuelve.
+6. **Fase grados** (`a-axis-degrees`): reportar home en grados (steps/48.19) + `N_AXIS=4`
+   (G-code `A`, planner, status). El homing ya fija 0°=chaflán ancho.
+
+## Comandos rápidos
 
 ```bash
-# Firmware (Docker, -Werror limpio)
+make -f tools/sim/Makefile.sim test   # 37 tests host
 docker run --rm -v "$PWD":/work -w /work cutcutgo-builder make -f tools/Makefile.firmware all
-# -> dist/cutcutgo_bl/production/Cutcutgo_maker1_bootloader_app.uf2
-
-# Bench baremetal (sin GRBL/motores)
-docker run --rm -v "$PWD":/work -w /work cutcutgo-builder \
-  bash -c "make -f tools/Makefile.firmware clean CONF=cutcutgo_bl && make -f tools/Makefile.firmware BENCH=1 CONF=cutcutgo_bl build-one uf2"
-
-# Sim host (22 tests)
-make -f tools/Makefile.sim test
-
-# Flash (BL mode: PAUSE al encender; montar y copiar)
-udisksctl mount -b /dev/sdd1 && cp bin/FIRMWARE_<hash>.uf2 /run/media/r2d2/Cutcutgo/
-
-# Convención de artefactos: bin/FIRMWARE_<hash>.uf2 (commit del código fuente),
-# bench: bin/BENCH_<hash>.uf2. Commits atómicos + "chore: firmware build <hash>".
+tools/flash.sh bin/FIRMWARE_3e571fe.uf2   # máquina en BL
+tools/tty.py send '$ZL' ; tools/tty.py send '$ZU=400' ; tools/tty.py send '$AS'   # barrido
+tools/tty.py send '$HA'    # homing (beep + GO antes)
+tools/tty.py send '$ARQ'   # refl crudo
 ```
-
-## Comandos serie nuevos (firmware normal)
-
-- `$HB` — blade reference (solo IDLE; luz necesaria) · `$BQ` — estado blade
-- `$DBGI2C|$DBGPWR|$DBGSAMP=n|$DBGI2CR=a,r|$DBGI2CW=a,r,v|$DBGRGB` — debug hardware (requieren IDLE; error:8 si no)
-- `$DBGMOTOR=<ch>,<dir>,<ms>` — drive directo de un canal HAL (ch: T1/T2/ACC/X/Y; dir: CW/CCW; ms<=2000, velocidad suave)
-
-## Tooling de sesión (nuevo)
-
-- `tools/tty.py` — consola serie scripted: `send` (delimita ok/error, exit 3 timeout), `monitor --secs`, `waitfor regex`; flock por device; exit 2 sin dispositivo. EL agente habla con la máquina sin copy-paste.
-- `tools/flash.sh <uf2> [tmo]` — flasheo determinista en BL: espera unidad "Cutcutgo", monta, copia, detecta re-enumeración CDC **por hardware-id** (no por puerto). La carrera del BL está resuelta.
-- `tools/llm.sh` — delegación a modelo local ornith (puerto 8090, OpenAI-compatible).
-- opencode: agente `delegate` (subagent → llama.cpp/local-llama-256) + plugin `.opencode/plugin/local-delegate.ts` (pinea explore/general al modelo local; escape `[main-model]`). Reiniciar opencode para cargar.
-- NOTA de delegación: el 9B NO para scripts/flash — eso es tooling determinista. Delegar solo cognición (resúmenes, análisis).
-
-## Hallazgos hardware/máquina (sesión 2)
-
-- `T1`+Z mueve el **worm del plunger de cuchilla** (TOOL2 motor) — el worm es autofrenante (no retrocedible a mano). `T0`/TOOL1 sin efecto visible.
-- Con herramienta puesta, `T1`+`G1 Z±2 F150` mueve suave y sin alarma (F1500 alarma — feed del worm limitado).
-- Stall-watchdog del stepper ES el endstop del homing (máquina sin endstops): `limits_set_state` durante homing solo marca el bit (`limits_disable` evita la alarma); fuera de homing lanzaba HARD_LIMIT → **bucle bloqueante = firmware muerto**. Fix c53ed76: ABORT_CYCLE no-bloqueante (ALARM viva, `$X` recupera). VERIFICACIÓN EN MÁQUINA PENDIENTE (test a).
-- Colisión HAL: `MOTOR_X_OCM=2` = `MOTOR_TOOL2_OCM=2` (mismo OC2) — mover X y TOOL2 a la vez se pisa el PWM. Pendiente reasignar pines (decisión del usuario).
-- Sensor 0x44: lecturas fluctúan con luz ambiente; umbrales requieren iluminación controlada.
 
 ## Referencias
 
-- Docs: https://virtualabs.github.io/cutcutgo/ · Esquemáticos: `schematics/CricutMaker-schematics.pdf`
-- Nota de hardware: `docs/head-detectors.md` (fuente de verdad de constantes de driver)
-- Openspec: `openspec status --change head-sensors`
+- `openspec/changes/a-axis-homing/` — proposal/specs/design/tasks.
+- `docs/a-axis-homing-encoder.md` — algoritmo sesión 4 (umbrales ANTIGUOS 15/55; los
+  actuales son 30/70).
+- `docs/spike-a-axis-blade-detection.md` (rama spike) — puzzle del detector de hoja.
