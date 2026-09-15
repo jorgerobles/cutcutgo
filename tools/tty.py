@@ -71,9 +71,9 @@ def cmd_send(args):
     con = Console(detect_port(args.dev))
     deadline = time.time() + args.timeout
     con.drain()
-    con.send_line(args.cmd)
+    con.send_line(args.command)
     if args.echo:
-        print("> " + args.cmd)
+        print("> " + args.command)
     while time.time() < deadline:
         for line in con.read_lines():
             print(line)
