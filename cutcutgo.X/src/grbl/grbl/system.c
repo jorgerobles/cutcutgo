@@ -24,6 +24,7 @@
 #include "config/cutcutgo/peripheral/evic/plib_evic.h"
 #include "hal/debug_probe.h"
 #include "hal/a_home_hal.h"
+#include "hal/z2_endstop.h"
 #include "blade_home.h"
 
 
@@ -153,6 +154,16 @@ uint8_t system_execute_line(char *line)
   }
   if ( strncmp(line, "$AQ", 3) == 0 && line[3] == 0 ) {
     a_home_hal_report();
+    return( STATUS_OK );
+  }
+  if ( strncmp(line, "$ZL", 3) == 0 && line[3] == 0 ) {
+    if ( sys.state != STATE_IDLE ) { return(STATUS_IDLE_ERROR); }
+    printString( z2_endstop_lower() ? "[Z2:DOWN]\r\n" : "[Z2:LOWER_FAIL]\r\n" );
+    return( STATUS_OK );
+  }
+  if ( strncmp(line, "$ZR", 3) == 0 && line[3] == 0 ) {
+    if ( sys.state != STATE_IDLE ) { return(STATUS_IDLE_ERROR); }
+    printString( z2_endstop_raise() ? "[Z2:UP]\r\n" : "[Z2:RAISE_FAIL]\r\n" );
     return( STATUS_OK );
   }
   switch( line[char_counter] ) {
