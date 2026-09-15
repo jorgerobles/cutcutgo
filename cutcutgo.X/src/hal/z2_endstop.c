@@ -14,6 +14,8 @@
 #define Z2_RAISE_SPEED      1800
 #define Z2_RAISE_CHUNK_MS   300
 #define Z2_RAISE_ATTEMPTS   20
+#define Z2_LOWER_CHUNK_MS   300
+#define Z2_LOWER_ATTEMPTS   30
 #define Z2_STALL_DZ_TOL     150
 
 static int32_t z2_steps(void)
@@ -41,6 +43,27 @@ uint8_t z2_endstop_raise(void)
         int32_t dz;
 
         z2_jog(HAL_MOTOR_DIR_CW, Z2_RAISE_CHUNK_MS);
+
+        dz = z2_steps() - before;
+        if (dz < 0)
+            dz = -dz;
+        if (dz <= Z2_STALL_DZ_TOL)
+            return 1;
+    }
+
+    return 0;
+}
+
+uint8_t z2_endstop_lower(void)
+{
+    int i;
+
+    for (i = 0; i < Z2_LOWER_ATTEMPTS; i++)
+    {
+        int32_t before = z2_steps();
+        int32_t dz;
+
+        z2_jog(HAL_MOTOR_DIR_CCW, Z2_LOWER_CHUNK_MS);
 
         dz = z2_steps() - before;
         if (dz < 0)

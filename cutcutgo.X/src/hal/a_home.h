@@ -34,12 +34,10 @@ typedef struct {
     int32_t (*read_refl)(void);
     /* A encoder steps (cumulative). */
     int32_t (*read_a_steps)(void);
-    /* Z2 encoder steps (top-stall drift monitor). */
+    /* Z2 encoder steps (chamfer-position drift monitor). */
     int32_t (*read_z2_steps)(void);
     /* Energize A in dir (+1 = CW, -1 = CCW) for ms, then stop and settle. */
     void (*pulse)(int8_t dir, uint32_t ms);
-    /* Precondition: 1 if blade is verified raised, 0 otherwise. */
-    uint8_t (*blade_raised)(void);
     /* 1 if the operator requested an abort. */
     uint8_t (*abort)(void);
 } a_home_ctx_t;

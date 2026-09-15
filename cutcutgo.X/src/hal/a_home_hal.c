@@ -47,18 +47,13 @@ static void ah_pulse(int8_t dir, uint32_t ms)
     delay_ms(A_HOME_COOLDOWN_MS);
 }
 
-static uint8_t ah_blade_raised(void)
-{
-    return z2_endstop_raise();
-}
-
 static uint8_t ah_abort(void)
 {
     return sys.abort ? 1 : 0;
 }
 
 static const a_home_ctx_t ah_ctx = {
-    ah_read_refl, ah_read_a, ah_read_z2, ah_pulse, ah_blade_raised, ah_abort
+    ah_read_refl, ah_read_a, ah_read_z2, ah_pulse, ah_abort
 };
 
 uint8_t a_home_hal_run(void)
@@ -69,7 +64,21 @@ uint8_t a_home_hal_run(void)
     if (sys.state != STATE_IDLE)
         return STATUS_IDLE_ERROR;
 
+    /* Raise the blade first (safety), then lower to the bottom stall where the
+     * reflective chamfer sits in the sensor's light path. */
+    if (!z2_endstop_raise()) {
+        printString("[AHOME:BLADE_DOWN]\r\n");
+        return STATUS_OK;
+    }
+    if (!z2_endstop_lower()) {
+        printString("[AHOME:FAULT]\r\n");
+        return STATUS_OK;
+    }
+
     r = a_home_run(&ah_ctx, &home);
+
+    /* Always raise back to top, regardless of the homing result. */
+    z2_endstop_raise();
 
     ah_last_ok = (r == A_HOME_OK);
     ah_last_home = home;

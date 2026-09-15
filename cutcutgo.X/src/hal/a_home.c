@@ -19,8 +19,11 @@
 #define A_HOME_PULSE_MS         150
 #define A_HOME_FINE_PULSE_MS    100
 
-/* Safety. */
-#define A_HOME_Z2_DZ_TOL        150
+/* Safety. Blade engagement (collar rub) starts ~2900 steps from top; a drift
+ * tolerance well below that (500 steps = ~0.63 mm) tolerates the small
+ * mechanical coupling/settling of Z2 during A rotation while still catching a
+ * real blade-engagement change. */
+#define A_HOME_Z2_DZ_TOL        500
 #define A_HOME_LATCH_LIMIT      5
 
 enum {
@@ -52,9 +55,6 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
     int32_t a;
     uint8_t phase = A_HOME_PHASE_SCAN;
     uint32_t frozen = 0;
-
-    if (!ctx->blade_raised())
-        return A_HOME_ERR_BLADE_DOWN;
 
     start = ctx->read_a_steps();
     z2_start = ctx->read_z2_steps();

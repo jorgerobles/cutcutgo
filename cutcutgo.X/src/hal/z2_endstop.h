@@ -14,4 +14,8 @@
 /* Raise Z2 to top stall in bounded chunks; 1 = parked at top, 0 = not parked. */
 uint8_t z2_endstop_raise(void);
 
+/* Lower Z2 to bottom stall (blade just above the mat, collar on the sensor
+ * piece) in bounded chunks; 1 = parked at bottom, 0 = not parked. */
+uint8_t z2_endstop_lower(void);
+
 #endif /* __INC_HAL_Z2_ENDSTOP_H */

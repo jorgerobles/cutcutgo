@@ -18,7 +18,6 @@ static int32_t sim_a;
 static int32_t sim_z2;
 static int32_t sim_start_a;
 static int32_t sim_start_z2;
-static uint8_t sim_blade_raised;
 static uint8_t sim_abort;
 static uint8_t sim_fault;
 static uint8_t sim_frozen;
@@ -59,12 +58,7 @@ static void c_pulse(int8_t dir, uint32_t ms)
     if (!sim_frozen)
         sim_a += PULSE_STEP;
     if (sim_drift_after && sim_pulses >= (uint32_t)sim_drift_after)
-        sim_z2 = sim_start_z2 + 200;
-}
-
-static uint8_t c_blade_raised(void)
-{
-    return sim_blade_raised;
+        sim_z2 = sim_start_z2 + 1000;
 }
 
 static uint8_t c_abort(void)
@@ -73,7 +67,7 @@ static uint8_t c_abort(void)
 }
 
 static const a_home_ctx_t ctx = {
-    c_read_refl, c_read_a, c_read_z2, c_pulse, c_blade_raised, c_abort
+    c_read_refl, c_read_a, c_read_z2, c_pulse, c_abort
 };
 
 static void reset_fixture(void)
@@ -82,7 +76,6 @@ static void reset_fixture(void)
     sim_z2 = 0;
     sim_start_a = 0;
     sim_start_z2 = 0;
-    sim_blade_raised = 1;
     sim_abort = 0;
     sim_fault = 0;
     sim_frozen = 0;
@@ -98,15 +91,6 @@ static void test_a_home_clean_rev(void)
     reset_fixture();
     TEST_ASSERT_EQUAL_INT(A_HOME_OK, a_home_run(&ctx, &home));
     TEST_ASSERT_TRUE(home >= INDEX_LO && home < INDEX_HI);
-}
-
-static void test_a_home_blade_down(void)
-{
-    int32_t home = -1;
-
-    reset_fixture();
-    sim_blade_raised = 0;
-    TEST_ASSERT_EQUAL_INT(A_HOME_ERR_BLADE_DOWN, a_home_run(&ctx, &home));
 }
 
 static void test_a_home_notrans(void)
@@ -168,7 +152,6 @@ __attribute__((constructor))
 static void register_test_a_home(void)
 {
     sim_register_test("test_a_home_clean_rev", test_a_home_clean_rev);
-    sim_register_test("test_a_home_blade_down", test_a_home_blade_down);
     sim_register_test("test_a_home_notrans", test_a_home_notrans);
     sim_register_test("test_a_home_seek_timeout", test_a_home_seek_timeout);
     sim_register_test("test_a_home_latch", test_a_home_latch);
