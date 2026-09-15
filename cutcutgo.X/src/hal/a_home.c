@@ -34,6 +34,13 @@ static int32_t ah_abs(int32_t v)
     return v < 0 ? -v : v;
 }
 
+static int32_t ga_drift;
+
+int32_t a_home_drift(void)
+{
+    return ga_drift;
+}
+
 a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
 {
     int32_t start;
@@ -59,7 +66,10 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
             return A_HOME_ERR_ABORT;
 
         if (ah_abs(ctx->read_z2_steps() - z2_start) > A_HOME_Z2_DZ_TOL)
+        {
+            ga_drift = ctx->read_z2_steps() - z2_start;
             return A_HOME_ERR_DRIFT;
+        }
 
         refl = ctx->read_refl();
         if (refl < 0)

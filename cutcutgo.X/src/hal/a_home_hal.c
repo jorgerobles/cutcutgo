@@ -91,7 +91,9 @@ uint8_t a_home_hal_run(void)
         printString("[AHOME:LATCH]\r\n");
         return STATUS_OK;
     case A_HOME_ERR_DRIFT:
-        printString("[AHOME:DRIFT]\r\n");
+        printString("[AHOME:DRIFT dz=");
+        printInteger((long)a_home_drift());
+        printString("]\r\n");
         return STATUS_OK;
     case A_HOME_ERR_FAULT:
         printString("[AHOME:FAULT]\r\n");

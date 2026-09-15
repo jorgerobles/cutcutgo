@@ -51,4 +51,7 @@ typedef struct {
  */
 a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps);
 
+/* Signed Z2 drift recorded when the last run returned A_HOME_ERR_DRIFT. */
+int32_t a_home_drift(void);
+
 #endif /* __INC_HAL_A_HOME_H */
