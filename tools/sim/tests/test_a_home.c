@@ -22,6 +22,7 @@ static uint8_t sim_blade_raised;
 static uint8_t sim_abort;
 static uint8_t sim_fault;
 static uint8_t sim_frozen;
+static uint8_t sim_no_index;
 static int32_t sim_drift_after;
 static uint32_t sim_pulses;
 
@@ -30,7 +31,7 @@ static int32_t refl_at(int32_t pos)
     if (pos >= SLOT_LO && pos < SLOT_HI)
         return 10;
     if (pos >= INDEX_LO && pos < INDEX_HI)
-        return 63;
+        return sim_no_index ? 40 : 63;
     return 40;
 }
 
@@ -85,6 +86,7 @@ static void reset_fixture(void)
     sim_abort = 0;
     sim_fault = 0;
     sim_frozen = 0;
+    sim_no_index = 0;
     sim_drift_after = 0;
     sim_pulses = 0;
 }
@@ -114,6 +116,15 @@ static void test_a_home_notrans(void)
     reset_fixture();
     sim_a = 100000; /* far from any slot/index in this linear plant */
     /* Scan window is 1.5 rev (26025 steps); from 100000 it exhausts. */
+    TEST_ASSERT_EQUAL_INT(A_HOME_ERR_NOTRANS, a_home_run(&ctx, &home));
+}
+
+static void test_a_home_seek_timeout(void)
+{
+    int32_t home = -1;
+
+    reset_fixture();
+    sim_no_index = 1; /* slot present, index never appears */
     TEST_ASSERT_EQUAL_INT(A_HOME_ERR_NOTRANS, a_home_run(&ctx, &home));
 }
 
@@ -159,6 +170,7 @@ static void register_test_a_home(void)
     sim_register_test("test_a_home_clean_rev", test_a_home_clean_rev);
     sim_register_test("test_a_home_blade_down", test_a_home_blade_down);
     sim_register_test("test_a_home_notrans", test_a_home_notrans);
+    sim_register_test("test_a_home_seek_timeout", test_a_home_seek_timeout);
     sim_register_test("test_a_home_latch", test_a_home_latch);
     sim_register_test("test_a_home_drift", test_a_home_drift);
     sim_register_test("test_a_home_fault", test_a_home_fault);

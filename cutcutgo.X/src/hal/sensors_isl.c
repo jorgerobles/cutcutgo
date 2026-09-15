@@ -12,7 +12,7 @@
 #define ISL_REG_CFG2       0x02
 #define ISL_REG_CH_A       0x0A
 #define ISL_ID_VALUE       0x7D
-#define ISL_BLADE_THRESHOLD 100
+#define ISL_BLADE_THRESHOLD 50
 
 static void dly(void)
 {
@@ -204,10 +204,10 @@ static sensor_status_t isl_setup(void)
         return SENSOR_OK;
 
     i2c_recover();
-    if (!isl_write_reg(ISL_REG_CFG1, 0x0D) ||
+    if (!isl_write_reg(ISL_REG_CFG1, 0x05) ||
         !isl_write_reg(ISL_REG_CFG2, 0x00))
         return SENSOR_FAULT;
-    if (!isl_read_reg(ISL_REG_CFG1, &v) || v != 0x0D)
+    if (!isl_read_reg(ISL_REG_CFG1, &v) || v != 0x05)
         return SENSOR_FAULT;
     isl_configured = 1;
     return SENSOR_OK;

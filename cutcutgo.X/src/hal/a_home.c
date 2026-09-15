@@ -88,6 +88,10 @@ a_home_result_t a_home_run(const a_home_ctx_t *ctx, int32_t *home_steps)
                 peak = a;
                 phase = A_HOME_PHASE_PEAK;
             }
+            else if (ah_abs(a - start) > A_HOME_SCAN_MAX_STEPS)
+            {
+                return A_HOME_ERR_NOTRANS;
+            }
             break;
 
         case A_HOME_PHASE_PEAK:
