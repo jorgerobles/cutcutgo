@@ -11,6 +11,7 @@
 
 #define A_HOME_PULSE_SPEED   2000
 #define A_HOME_COOLDOWN_MS   1000
+#define A_HOME_Z2_SETTLE_MS  1500
 
 static int32_t ah_last_home;
 static uint8_t ah_last_ok;
@@ -74,6 +75,9 @@ uint8_t a_home_hal_run(void)
         printString("[AHOME:FAULT]\r\n");
         return STATUS_OK;
     }
+    /* Let the return spring settle (~1 mm rebound) before the A homing, so
+     * the drift monitor starts from the settled reading position. */
+    delay_ms(A_HOME_Z2_SETTLE_MS);
 
     r = a_home_run(&ah_ctx, &home);
 
