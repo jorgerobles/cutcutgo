@@ -17,6 +17,7 @@
 #define Z2_LOWER_CHUNK_MS   300
 #define Z2_LOWER_ATTEMPTS   30
 #define Z2_STALL_DZ_TOL     150
+#define Z2_STEP_ATTEMPTS    200
 
 static int32_t z2_steps(void)
 {
@@ -73,4 +74,33 @@ uint8_t z2_endstop_lower(void)
     }
 
     return 0;
+}
+
+uint8_t z2_raise_steps(int32_t steps)
+{
+    int32_t start = z2_steps();
+    int32_t moved;
+    int i;
+
+    hal_motor_set_manual(&HAL_MOTOR_Z2, true);
+    hal_motor_set_speed(&HAL_MOTOR_Z2, Z2_RAISE_SPEED);
+    hal_motor_set_direction(&HAL_MOTOR_Z2, HAL_MOTOR_DIR_CW);
+
+    for (i = 0; i < Z2_STEP_ATTEMPTS; i++)
+    {
+        delay_ms(10);
+        moved = z2_steps() - start;
+        if (moved < 0)
+            moved = -moved;
+        if (moved >= steps)
+            break;
+    }
+
+    hal_motor_set_direction(&HAL_MOTOR_Z2, HAL_MOTOR_STOP);
+    hal_motor_set_manual(&HAL_MOTOR_Z2, false);
+
+    moved = z2_steps() - start;
+    if (moved < 0)
+        moved = -moved;
+    return (moved >= steps) ? 1 : 0;
 }

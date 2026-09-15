@@ -18,4 +18,7 @@ uint8_t z2_endstop_raise(void);
  * piece) in bounded chunks; 1 = parked at bottom, 0 = not parked. */
 uint8_t z2_endstop_lower(void);
 
+/* Raise Z2 by `steps` encoder steps (step-counted, bounded). 1 = moved. */
+uint8_t z2_raise_steps(int32_t steps);
+
 #endif /* __INC_HAL_Z2_ENDSTOP_H */

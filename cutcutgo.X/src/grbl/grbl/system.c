@@ -166,6 +166,16 @@ uint8_t system_execute_line(char *line)
     printString( z2_endstop_raise() ? "[Z2:UP]\r\n" : "[Z2:RAISE_FAIL]\r\n" );
     return( STATUS_OK );
   }
+  if ( strncmp(line, "$ZU=", 4) == 0 ) {
+    uint32_t steps = 0;
+    const char *s = line + 4;
+
+    if ( sys.state != STATE_IDLE ) { return(STATUS_IDLE_ERROR); }
+    while (*s >= '0' && *s <= '9') { steps = steps * 10 + (uint32_t)(*s - '0'); s++; }
+    if (steps == 0) { return(STATUS_INVALID_STATEMENT); }
+    printString( z2_raise_steps((int32_t)steps) ? "[Z2:RAISED]\r\n" : "[Z2:RAISE_FAIL]\r\n" );
+    return( STATUS_OK );
+  }
   switch( line[char_counter] ) {
     case 0 : report_grbl_help(); break;
     case 'J' : // Jogging
