@@ -22,4 +22,7 @@ void a_home_hal_report(void);
 /* Print the raw GREEN reflectance byte (non-motion, for calibration). */
 void a_home_hal_refl(void);
 
+/* Rotate A in pulses, sample reflectance, report min/max over ~1.5 rev. */
+void a_home_hal_scan(void);
+
 #endif /* __INC_HAL_A_HOME_HAL_H */

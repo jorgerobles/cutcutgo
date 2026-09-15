@@ -12,6 +12,9 @@
 #define A_HOME_PULSE_SPEED   2000
 #define A_HOME_COOLDOWN_MS   1000
 #define A_HOME_Z2_SETTLE_MS  1500
+#define A_HOME_PULSE_MS      150
+#define A_SCAN_MAX_STEPS     (17350 + 17350 / 2)
+#define A_SCAN_MAX_PULSES    40
 
 static int32_t ah_last_home;
 static uint8_t ah_last_ok;
@@ -140,5 +143,49 @@ void a_home_hal_refl(void)
     }
     printString("[AREFL:");
     printInteger((long)(refl >> 8));
+    printString("]\r\n");
+}
+
+void a_home_hal_scan(void)
+{
+    int32_t refl;
+    int32_t min = 999;
+    int32_t max = -1;
+    int32_t a_start = HAL_MOTOR_A.current_steps;
+    int32_t d;
+    int samples = 0;
+    int i;
+
+    for (i = 0; i < A_SCAN_MAX_PULSES; i++)
+    {
+        refl = ah_read_refl();
+        if (refl < 0)
+        {
+            printString("[ASCAN:FAULT]\r\n");
+            return;
+        }
+        if (refl < min)
+            min = refl;
+        if (refl > max)
+            max = refl;
+        samples++;
+
+        ah_pulse(1, A_HOME_PULSE_MS);
+
+        d = HAL_MOTOR_A.current_steps - a_start;
+        if (d < 0)
+            d = -d;
+        if (d > A_SCAN_MAX_STEPS)
+            break;
+    }
+
+    printString("[ASCAN:min=");
+    printInteger((long)min);
+    printString(" max=");
+    printInteger((long)max);
+    printString(" span=");
+    printInteger((long)(max - min));
+    printString(" samples=");
+    printInteger((long)samples);
     printString("]\r\n");
 }
