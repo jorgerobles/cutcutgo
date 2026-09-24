@@ -25,4 +25,9 @@ void a_home_hal_refl(void);
 /* Rotate A in pulses, sample reflectance, report min/max over ~1.5 rev. */
 void a_home_hal_scan(void);
 
+/* Diagnostic trace: position Z2 to the chamfer, then sweep A emitting one
+ * "AT <steps>,<refl>" line per sample (host counts steps between slots to
+ * measure steps/rev). Terminated by "ATDONE". */
+void a_home_hal_trace(void);
+
 #endif /* __INC_HAL_A_HOME_HAL_H */

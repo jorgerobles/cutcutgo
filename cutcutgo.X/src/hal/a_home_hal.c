@@ -7,6 +7,7 @@
 #include "hal/z2_endstop.h"
 #include "hal/motor.h"
 #include "hal/sensors.h"
+#include "hal/timer.h"
 #include "grbl/grbl/grbl.h"
 
 #define A_HOME_PULSE_SPEED   2200
@@ -14,8 +15,19 @@
 #define A_HOME_Z2_SETTLE_MS  1500
 #define A_HOME_Z2_RETRACT    400
 #define A_HOME_PULSE_MS      150
-#define A_SCAN_MAX_STEPS     (17350 + 17350 / 2)
+#define A_SCAN_MAX_STEPS     (27600 + 27600 / 2)
 #define A_SCAN_MAX_PULSES    40
+
+/* Diagnostic capture: port of the spike 'cap' command (the version validated
+ * on hardware). Spins A continuously while sampling encoder steps + GREEN
+ * reflectance into a ring buffer in a tight loop (no serial/USB work during
+ * sampling — the I2C read is the only pacing), then dumps CSV. No Z2
+ * precondition: the operator positions Z2 via $ZL/$ZR/$ZU first. The A
+ * encoder has no Z index, so the host counts steps between the two slots
+ * (180 deg apart) to derive steps/rev. */
+#define AT_PULSE_SPEED   2000
+#define AT_DURATION_MS   20000
+#define AT_BUF_SIZE      2000
 
 static int32_t ah_last_home;
 static uint8_t ah_last_ok;
@@ -194,4 +206,53 @@ void a_home_hal_scan(void)
     printString(" samples=");
     printInteger((long)samples);
     printString("]\r\n");
+}
+
+void a_home_hal_trace(void)
+{
+    typedef struct { int32_t a; int32_t z2; int16_t r; } at_sample_t;
+    static at_sample_t at_buf[AT_BUF_SIZE];
+    uint32_t head = 0, count = 0;
+    uint32_t deadline = timer_get_ms() + AT_DURATION_MS;
+    int32_t refl;
+    uint32_t n, start, i;
+
+    hal_motor_init(&HAL_MOTOR_A, HAL_MOTOR_PWM);
+    hal_motor_set_manual(&HAL_MOTOR_A, true);
+    hal_motor_set_speed(&HAL_MOTOR_A, AT_PULSE_SPEED);
+    hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_DIR_CW);
+
+    /* Tight loop — no serial/USB work during sampling; the ISL29125 I2C read
+     * is the only pacing (matches the spike 'cap' capture). */
+    while ((int32_t)(timer_get_ms() - deadline) < 0) {
+        refl = -1;
+        mark_detector_read(&refl);
+        at_buf[head].a = HAL_MOTOR_A.current_steps;
+        at_buf[head].z2 = HAL_MOTOR_Z2.current_steps;
+        at_buf[head].r = (int16_t)((refl < 0) ? -1 : (refl >> 8));
+        head = (head + 1) % AT_BUF_SIZE;
+        count++;
+    }
+
+    hal_motor_set_direction(&HAL_MOTOR_A, HAL_MOTOR_STOP);
+    hal_motor_set_manual(&HAL_MOTOR_A, false);
+
+    n = count < AT_BUF_SIZE ? count : AT_BUF_SIZE;
+    start = (count >= AT_BUF_SIZE) ? head : 0;
+    printString("[AT] total=");
+    printInteger((long)count);
+    printString(" dump=");
+    printInteger((long)n);
+    printString("\r\n");
+    for (i = 0; i < n; i++) {
+        uint32_t idx = (start + i) % AT_BUF_SIZE;
+
+        printInteger((long)at_buf[idx].a);
+        printString(",");
+        printInteger((long)at_buf[idx].z2);
+        printString(",");
+        printInteger((long)at_buf[idx].r);
+        printString("\r\n");
+    }
+    printString("[ATDONE]\r\n");
 }

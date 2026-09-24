@@ -15,12 +15,18 @@
 #define A_HOME_SLOT_REFL        30
 #define A_HOME_INDEX_REFL       70
 
-/* Geometry (encoder steps). */
-#define A_HOME_STEPS_PER_REV    17350
+/* Geometry (encoder steps). Re-measured cold on-machine: slot-to-slot
+ * (180 deg) ~13800 steps, two independent methods (dip-gap median and
+ * autocorrelation P=11 with exact P=22 harmonic). 2 x 13800 = 27600.
+ * Replaces the session-4 value (17350), which left the 1.5-rev scan limit
+ * covering only ~0.94 real revolutions. */
+#define A_HOME_STEPS_PER_REV    27600
 #define A_HOME_SCAN_MAX_STEPS   (A_HOME_STEPS_PER_REV + A_HOME_STEPS_PER_REV / 2)
 
-/* Chamfer discrimination: peak width >= this (~49 deg) is the wide chamfer. */
-#define A_HOME_WIDE_MIN_STEPS   2370
+/* Chamfer discrimination: peak width >= this is the wide chamfer. At
+ * 27600/360 = 76.7 steps/deg: wide ~55.7 deg (~4270 steps), narrow
+ * <=42.7 deg (~3270 steps). Threshold sits between both. */
+#define A_HOME_WIDE_MIN_STEPS   3750
 
 /* Pulse timing. 150 ms is the shortest reliable pulse for A (motor must move;
  * session-4 minimum). Finer angular resolution comes from a slower PWM speed

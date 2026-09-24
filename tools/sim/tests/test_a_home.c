@@ -5,17 +5,19 @@
 #include "hal/a_home.h"
 #include "test_registry.h"
 
-/* Plant: periodic holder signature (period 17350 steps) with two slots and a
- * WIDE chamfer (3000 steps) and a NARROW chamfer (1000 steps). A pulse
- * advances the encoder by ms * PULSE_RATE steps. */
+/* Plant: periodic holder signature (period 27600 steps, re-measured cold
+ * on-machine) with two slots (180 deg apart) and a WIDE chamfer (~4300
+ * steps) and a NARROW chamfer (~1000 steps in fixture; real ~3270 — both
+ * must straddle A_HOME_WIDE_MIN_STEPS). A pulse advances the encoder by
+ * ms * PULSE_RATE steps. */
 
-#define REV         17350
+#define REV         27600
 #define PULSE_RATE  2   /* steps per ms: ~300 steps per 150 ms pulse (slow speed) */
 
-#define WIDE_LO    3500
-#define WIDE_HI    6500
-#define NARROW_LO  12175
-#define NARROW_HI  13175
+#define WIDE_LO    5000
+#define WIDE_HI    9300
+#define NARROW_LO  19000
+#define NARROW_HI  20000
 
 static int32_t sim_a;
 static int32_t sim_z2;
@@ -38,7 +40,7 @@ static int32_t refl_at(int32_t pos)
         return 40;
     if (p < 1200)
         return 10;
-    if (p >= 8675 && p < 9875)
+    if (p >= 13800 && p < 15000)
         return 10;
     if (p >= WIDE_LO && p < WIDE_HI)
         return sim_no_index ? 40 : 83;
@@ -107,7 +109,7 @@ static void test_a_home_clean_rev(void)
     int32_t home = -1;
 
     reset_fixture();
-    sim_a = 16000; /* base, before the slot that precedes the wide chamfer */
+    sim_a = 13000; /* base, before the slot that precedes the wide chamfer */
     TEST_ASSERT_EQUAL_INT(A_HOME_OK, a_home_run(&ctx, &home));
     TEST_ASSERT_TRUE(norm(home) >= WIDE_LO && norm(home) < WIDE_HI);
 }
@@ -117,7 +119,7 @@ static void test_a_home_narrow_skipped(void)
     int32_t home = -1;
 
     reset_fixture();
-    sim_a = 8000; /* base, before the slot that precedes the NARROW chamfer */
+    sim_a = 15500; /* base, before the NARROW chamfer */
     TEST_ASSERT_EQUAL_INT(A_HOME_OK, a_home_run(&ctx, &home));
     TEST_ASSERT_TRUE(norm(home) >= WIDE_LO && norm(home) < WIDE_HI);
 }

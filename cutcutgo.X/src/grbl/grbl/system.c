@@ -165,6 +165,11 @@ uint8_t system_execute_line(char *line)
     a_home_hal_scan();
     return( STATUS_OK );
   }
+  if ( strncmp(line, "$AT", 3) == 0 && line[3] == 0 ) {
+    if ( sys.state != STATE_IDLE ) { return(STATUS_IDLE_ERROR); }
+    a_home_hal_trace();
+    return( STATUS_OK );
+  }
   if ( strncmp(line, "$ZL", 3) == 0 && line[3] == 0 ) {
     if ( sys.state != STATE_IDLE ) { return(STATUS_IDLE_ERROR); }
     printString( z2_endstop_lower() ? "[Z2:DOWN]\r\n" : "[Z2:LOWER_FAIL]\r\n" );
