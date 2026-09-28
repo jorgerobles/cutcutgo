@@ -6,7 +6,7 @@ Promote A from a debug-driven motor to a real rotary axis in degrees: G-code `A`
 ## ADDED Requirements
 
 ### Requirement: G-code A words move the axis in degrees
-The g-code parser SHALL accept `A<value>` words and convert them to A-axis steps using `steps_per_degree` (≈48.2, derived from the measured ≈17350 steps/rev). `A` SHALL be treated as a rotary axis (no soft-limit clamping in degrees unless enabled).
+The g-code parser SHALL accept `A<value>` words and convert them to A-axis steps using `steps_per_degree` (≈76.19, derived from the measured ≈27,428 steps/rev). `A` SHALL be treated as a rotary axis (no soft-limit clamping in degrees unless enabled).
 
 #### Scenario: A word commands rotation
 - **WHEN** a job contains `A90` while homed

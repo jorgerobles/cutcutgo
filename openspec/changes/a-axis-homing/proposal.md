@@ -26,7 +26,7 @@ promote A to a *real* rotary axis in degrees with a reliable homing reference.
 - **Real A axis in degrees** (`a-axis-degrees`): promote A from a motor driver
   to a full rotary axis — `N_AXIS=4`, G-code `A` words in degrees, planner and
   custom Bresenham tracer extended to carry A, `steps_per_degree` derived from
-  the measured ≈17350 steps/rev, status report includes A position, and A
+  the measured ≈27,428 steps/rev, status report includes A position, and A
   homing integrated so `$H` (or `$HA`) establishes A=0 at the optical index.
 
 ## Capabilities

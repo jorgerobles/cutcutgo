@@ -1,95 +1,99 @@
 # HANDOFF — CutCutGo / Cricut Maker 1
 
-Fecha: 2026-09-15 (sesión 5 — **homing de A en GRBL, casi**)
-Estado: homing óptico de A implementado en `develop` (cambio OpenSpec `a-axis-homing`),
-host-validado (sim 37/37) y `-Werror` limpio. Pendiente: validar on-machine — la máquina
-quedó **bloqueada** (pulso de 50 ms demasiado corto) y hay que power-cyclear.
+Fecha: 2026-09-28 (sesión 6 — **causa raíz de la deriva de refl resuelta: CFG2 IR-comp**).
+Estado: spike firmware en la máquina, firma óptica recuperada (ranura/chaflán visibles),
+diseño de homing adaptativo acordado con el operador. Pendiente: barrido fino del chaflán,
+fijar CFG2=0x3F en firmware, portar homing dinámico a `a_home`.
 
 ---
 
-## SESIÓN 5 (esta) — resumen ejecutivo
+## SESIÓN 6 (esta) — resumen ejecutivo
 
-1. **Reorganización de ramas**: spike → `feat/spike-firmware` (3b582db, conserva todo).
-   `develop` = producción (84 commits, hasta 99399fa beep.sh). `main` NO se tocó.
-2. **Archivado `remap-motors-add-a-axis`** (rename Z1/Z2/A + A bring-up); specs
-   `a-axis-control` + `motor-axis-map` sincronizadas a `openspec/specs/`.
-3. **Nuevo cambio `a-axis-homing`** (proposal/specs/design/tasks): homing óptico absoluto
-   de A + eje A real en grados (`N_AXIS=4`). 9/17 tareas.
-4. **Sensor**: portado el priming 0x09→0x0A y **CFG1=0x05** (el spike terminó en 0x05, no
-   0x0D como decía el HANDOFF viejo). `ISL_BLADE_THRESHOLD` 100→50.
-5. **Homing de A en GRBL** (`hal/a_home.c` puro + `hal/a_home_hal.c` + `hal/z2_endstop.c`).
-   Comandos: `$HA` (homing), `$AQ` (reporte), `$ARQ` (refl crudo), `$AS` (barrido),
-   `$ZL`/`$ZR`/`$ZU=<steps>` (bajar/subir/afinar Z2).
-6. **Bug de tooling arreglado**: `tools/tty.py send` usaba `args.cmd` (no existía) →
-   AttributeError. Corregido a `args.command`.
+1. **Causa raíz de la deriva de refl (23↔115) = CFG2 en 0.** El ISL29125 tiene
+   compensación IR activa (CFG2 0x02: bit7 IRCOM + bits[5:0] ALSCC, 0–63). `isl_setup()`
+   escribía CFG2=0x00 (sin compensación) → el IR ambiente se colaba al canal GREEN y la
+   base vagaba. **CFG2=0x3F** (ALSCC=63 máx, bit7=0 para evitar el NACK de la variante
+   Cricut) restaura la firma: plateau ~55, ranura ~11 (caída 80%), chaflán ~59-75.
+   Queda una deriva lenta monotónica (~4 min) probablemente térmica.
+2. **steps/rev = 27,428** (76.19 st/°), NO 17,350. 17,350 era un espaciado de features,
+   no una revolución. Ancla visual operador-verificada: 13,714 steps = 180.1°.
+3. **Velocidad de A continua vía OCxRS**: 2000→8160 st/s, 2100→4985, 2200→2618,
+   2300→230, 2400→240. Banda lenta (2300-2400, ~230 st/s) = creep cerca de fricción
+   estática del wormgear; da resolución fina (~34 steps/150ms). NO hay "cliff".
+4. **Algoritmo de homing adaptativo (split & refine, protocolo del operador):** barrido
+   grueso localiza features; en cada transición (variación de refl en un arco pequeño,
+   ej. 5°) retrocede y re-barre a resolución fina para fijar flancos; ancho de chaflán =
+   distancia entre flancos × ángulo/paso. Discrimina ancho=Este de estrecho=Oeste. Solo
+   se refina en flancos, no toda la vuelta. **Robusto a la deriva** (mide flancos
+   relativos, no niveles absolutos).
+5. **`arm` en el spike es un flag software de confirmación (blade raised), NO el enable
+   del motor** (el enable lo hace `jog_start` vía `hal_motor_init`+`set_manual`). El flag
+   se limpia en cada reboot → `a cw` da `REFUSED` si no se re-`arm`.
+6. **El emisor IR va hardwired al rail** (se enciende al enchufar, sin pasar por el MCU).
+   No hay control programático → no hay compensación por apagado de LED.
+7. **BUG de dirección del eje A (encoder) — RESUELTO**: `motor_encoder.c` comparaba
+   `direction == motor->direction` (el comando del momento, cambia por jog) → `current_steps`
+   monotónico (siempre sube o siempre baja). El engranaje holder↔piñón solo volteaba el signo.
+   **Fix commiteado en `feat/spike-firmware`**: comparar contra referencia fija `M_CW` →
+   contador de posición bidireccional (`cw`→holder CW→piñón CCW→decrementa, `ccw`→incrementa).
+   Verificado on-machine. (Hipótesis anterior de swap IN1/IN2 era incorrecta, revertida.)
+8. **Workaround para barrido fino sin dirección CCW** (obsoleto tras el fix): el eje es
+   rotativo (27,428 pasos = 1 vuelta), así que se daba la vuelta solo en `cw`; ya no hace
+   falta porque el contador es bidireccional.
 
-## Descubrimientos clave (corrigen el HANDOFF de sesión 4)
+## Descubrimientos clave (corrigen el HANDOFF de sesión 5)
 
-- **El chaflán se lee con Z2 BAJADO, no en tope.** En tope refl=35-43 (solo base, sin
-  pico). La firma angular (slot<30, pico>70) se lee con Z2 en el stall inferior + rebote
-  del muelle + **retract de 400 steps (0.5 mm)**. Sin bajar, el `$HA` da NOTRANS.
-- **Geometría del chaflán (calibre D=11, ancho=5.14)**: chaflán ancho = **55.7° (~2685
-  steps)**, chaflán estrecho ≤4mm = **≤42.7° (~2055 steps)**. `steps/grado = 48.19`
-  (17350/rev). 0° = centro del chaflán ancho.
-- **No es trivial distinguir ancho/estrecho**: N/S (ranuras) y E/W (chaflanes) están a
-  180°, así que desde cualquier ranura hay un chaflán a ~3500 steps. El discriminador es
-  la **anchura del pico** (umbral ~2370 steps ≈ 49°), no el espaciado.
-- **Umbrales actuales (calibración actual, desplazados de sesión 4)**: ranura <30
-  (medido 19), índice >70 (medido 83-95). La sesión 4 decía 15/55 — no valen aquí.
-- **Barrido**: 50 ms NO mueve A (mínimo fiable ~150 ms). 150 ms@2000 = ~900 steps (muy
-  grueso para discriminar anchura). Solución: **velocidad 2200 (más lenta)** a 150 ms.
+- **CFG1=0x05** = MODE RGB(101) + RNG=0 (375 lux) + 16-bit + SYNC=0. El commit "correct
+  mode for blade IR detection" solo cambió RNG 10k→375 lux (0x0D→0x05). CFG1 se mantiene
+  en 0x05.
+- **CFG2=0x3F** es la pieza que faltaba (sesión 5 lo dejaba en 0x00). El datasheet
+  recomienda 0xBF (máx IR comp + rangos estándar), pero la variante Cricut NACKea bit7
+  (IRCOM), así que se usa 0x3F (ALSCC máx sin IRCOM).
+- **Posición de lectura (SET IN STONE)**: plunger Z2 en **stall inferior**. Con el holder
+  arriba hay material absorbedor → lecturas en blanco. Tras plegar/desplegar la máquina
+  el Z2 NO queda en stall (lectura plana sin features); hay que bajar Z2 antes de medir.
+- **Geometría**: ranuras ×2 alineadas N/S; chaflanes ×2 planos E/O (ancho=Este=índice,
+  estrecho=Oeste). Motor CW = hoja CCW (inversión tractor→holder). Filo triangular define
+  "hacia dónde mira". Home preferente = filo al NORTE (ranura norte bajo el sensor).
+- **I2C del sensor**: lectura 0x09 ANTES de 0x0A es OBLIGATORIA (latch). Bus a ~100kHz
+  (dly 100 iters). Lectura ~15ms (límite = clock-stretching del sensor). Muestreo en giro
+  continuo es inútil; solo stop-go con lectura asentada por parada.
+- **La máquina cae a BL / reboota intermitentemente** en corridas largas o entre comandos.
+  En BL aparece como `04d8:0009` (MSD) en `lsusb`, NO como CDC (`04d8:000a`).
 
-## Estado físico de la máquina (IMPORTANTE)
+## Estado físico de la máquina
 
-- **BLOQUEADA**: el último `$HA` (firmware 5fdb3d5 con pulso 50 ms) dejó el main loop
-  colgado (A apenas gira en 50 ms). **No responde a serial** → power-cycle
-  (desconectar/reconectar USB).
-- Último firmware flasheado: `5fdb3d5` (malo). **Corregido pero SIN flashear**:
-  `FIRMWARE_3e571fe.uf2` (150 ms + velocidad 2200 + settle-antes-retract).
+- Spike firmware flasheado (worktree `feat/spike-firmware` HEAD `305a794` + variante
+  EMPTY). Funcionando: CDC vivo, firma visible.
+- CFG2 se dejó en 0x3F en vivo (comando `w 2 63`) — se pierde en el próximo reboot
+  (hay que re-escribirlo o, mejor, fijarlo en `isl_setup()`).
 
-## Qué está hecho (todo en `develop`, commiteado)
+## Qué está pendiente (orden sugerido)
 
-| Commit | Qué |
-|---|---|
-| `d9e5156` | archiva remap-motors-add-a-axis |
-| `d63cec4` | crea cambio a-axis-homing |
-| `0476975` | priming 0x09→0x0A |
-| `d4d4cba` | CFG1 0x05 + SEEK scan-limit (fix loop infinito) |
-| `babe9f3` | wiring $HA/$AQ + z2_endstop + a_home_hal |
-| `e9e1b10` | baja Z2 a stall antes de rotar A |
-| `1a09139` | discriminación ancho/estrecho por anchura de pico + retract 400 |
-| `5fdb3d5` | barrido 50ms (DESCARTADO) + settle-antes-retract + diag NOTRANS |
-| `3e571fe` | 150 ms + velocidad 2200 (resolución fina) |
-| `8df1dde` | fix tty.py |
+1. **Barrido fino del chaflán** (speed 2300, ~34 steps/pulso) sobre el arco del chaflán
+   (~a=-66655..-75824, ~9200 steps) para medir su ancho exacto por flancos.
+2. **Fijar CFG2=0x3F en firmware** (`isl_setup()` en `sensors_isl.c`, spike y develop).
+3. **Portar el homing dinámico/adaptativo a `a_home`**: umbral relativo (base medida en
+   runtime), detección por flancos, disambiguación ancho/estrecho por secante. Reemplaza
+   los `A_HOME_SLOT_REFL=30`/`INDEX_REFL=70` fijos.
+4. **Resolver la deriva térmica residual** (opcional): calibrar ALSCC (no "máx") o aceptar
+   el enfoque por flancos que ya la tolera.
+5. **`$HA` end-to-end** con las constantes nuevas (27428) y home = filo norte.
 
-## Próxima sesión (orden sugerido)
+## Comandos rápidos (spike)
 
-1. **Power-cycle** la máquina → BL (PAUSE+encendido) → `tools/flash.sh bin/FIRMWARE_3e571fe.uf2`.
-2. **Verificar posición de lectura**: `$ZL` → esperar rebote → `$ZU=400` → `$AS` (debe
-   dar span~76: min~19 ranura, max~95 pico).
-3. **`$HA`** (beep + GO): debe devolver `[AHOME:ok steps=...]`. Si NOTRANS, el diag
-   ahora imprime `min/max` de refl.
-4. **Medir steps/pulso a velocidad 2200**: `$AS` y comparar samples vs 1.5 rev.
-5. **Verificar umbral de anchura (2370) on-machine**: el pico de refl puede no abarcar
-   los 55.7° geométricos (reflexión especular). Alternativa: discriminar por **altura**
-   del pico (ancho ~95 vs estrecho ~60?) si la anchura no resuelve.
-6. **Fase grados** (`a-axis-degrees`): reportar home en grados (steps/48.19) + `N_AXIS=4`
-   (G-code `A`, planner, status). El homing ya fija 0°=chaflán ancho.
-
-## Comandos rápidos
-
-```bash
-make -f tools/sim/Makefile.sim test   # 37 tests host
-docker run --rm -v "$PWD":/work -w /work cutcutgo-builder make -f tools/Makefile.firmware all
-tools/flash.sh bin/FIRMWARE_3e571fe.uf2   # máquina en BL
-tools/tty.py send '$ZL' ; tools/tty.py send '$ZU=400' ; tools/tty.py send '$AS'   # barrido
-tools/tty.py send '$HA'    # homing (beep + GO antes)
-tools/tty.py send '$ARQ'   # refl crudo
+```
+tools/flash.sh <uf2>              # máquina en BL (PAUSE+encendido)
+# consola spike (tty.py o python serial):
+#   arm / disarm / t / r <reg> / w <reg> <val> / cap <ms> <speed>
+#   <x|y|z1|z2|a> <cw|ccw> <ms> [speed]   # speed=OCxRS (más alto = más lento)
+#   ch (latch test), i, c, f, m, adc
 ```
 
 ## Referencias
 
-- `openspec/changes/a-axis-homing/` — proposal/specs/design/tasks.
-- `docs/a-axis-homing-encoder.md` — algoritmo sesión 4 (umbrales ANTIGUOS 15/55; los
-  actuales son 30/70).
+- `openspec/changes/a-axis-homing/` — proposal/specs/design/tasks (actualizados sesión 6:
+  27428 st/rev, 76.19 st/°, CFG2=0x3F, umbrales dinámicos, algoritmo adaptativo).
+- `docs/a-axis-calibration.md` — calibración 2026-09-28 (anclas, geometría, I2C, emisor).
+- `docs/a-axis-homing-encoder.md` — algoritmo sesión 4 (umbrales ANTIGUOS 15/55).
 - `docs/spike-a-axis-blade-detection.md` (rama spike) — puzzle del detector de hoja.

@@ -19,12 +19,12 @@
 ## 4. On-machine supervised validation
 
 - [ ] 4.1 Supervised `$HA` run: confirm index accuracy (± one fine-pulse) and the reported deg matches the mechanical index; record transcript in `docs/`
-- [ ] 4.2 Retune thresholds with a dense revolution pass (150 ms × 24) if the unit signature drifts; update the named constants and re-commit
+- [ ] 4.2 Retune thresholds with a dense revolution pass (60–90 samples/rev, PWM 2000 stop-go) — session 5 (2026-09-28) showed fixed thresholds are fragile (base drifts 23–91, chamfer peak absent after fold/unfold); replace with **dynamic thresholds** (runtime base + relative slot dip) and chamfer-width disambiguation per `design.md`
 - [ ] 4.3 Verify the abort paths on-machine where safe (blade-down refusal; frozen-encoder detection via blocked wormgear with immediate power-down)
 
 ## 5. Degrees promotion (`N_AXIS=4`, gated on homing solid)
 
-- [ ] 5.1 `config.h` `N_AXIS=4`, `defaults.h`/`settings.c` add A (steps_per_degree ≈ 48.2, max rate, accel), `gcode.c` parse `A` words
+- [ ] 5.1 `config.h` `N_AXIS=4`, `defaults.h`/`settings.c` add A (steps_per_degree ≈ 76.19, max rate, accel), `gcode.c` parse `A` words
 - [ ] 5.2 Extend the custom Bresenham tracer + planner to carry A → `HAL_MOTOR_A`; verify X/Y/Z-only jobs behave identically (host sim + on-machine)
 - [ ] 5.3 Status report / protocol include A position in degrees; homing gates A-word motion until A is homed
 - [ ] 5.4 Host-sim tracer/planner regression + on-machine A-word job; commit `FIRMWARE_<hash>.uf2`

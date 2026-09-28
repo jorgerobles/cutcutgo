@@ -5,19 +5,26 @@ Give the A axis (blade rotation, wormgear) an absolute home reference using the 
 
 ## ADDED Requirements
 
+### Requirement: Sensor configured with active IR compensation
+The ISL29125 SHALL be configured with active IR compensation (CFG2 = 0x3F: ALSCC[5:0]=63, IRCOM bit7=0 to avoid the Cricut variant's NACK), otherwise ambient IR leaks into the GREEN channel and the reflectance base drifts (23↔115), washing out the slot/chamfer signature. CFG1 SHALL remain 0x05 (RGB, 16-bit, 375-lux range).
+
+#### Scenario: IR compensation restores a stable base
+- **WHEN** the sensor is read with CFG2=0x3F
+- **THEN** the plateau base is stable (~55) and the slot dip (~11) is resolvable, without the multi-session drift seen with CFG2=0x00
+
 ### Requirement: Absolute A homing from the optical signature
-The homing sequence SHALL drive A in short PWM pulses and, with the motor stopped, sample the GREEN reflectance to detect the slot (refl < 15) followed by the wide-chamfer index peak (refl > 55), and SHALL set A home to the index peak. The sequence SHALL recover 0° in at most one revolution plus the slot→index spacing (≈17350 + 3500 steps).
+The homing sequence SHALL drive A in short PWM pulses and, with the motor stopped, sample the GREEN reflectance to locate the slot (a relative dip below the runtime-measured base) and the chamfer peaks, and SHALL disambiguate the two chamfers by their angular width (wide = index = East, narrow = West) to resolve absolute 0° at the North slot. The sequence SHALL recover 0° in at most two revolutions (≈ 2 × 27,428 steps).
 
 #### Scenario: Clean revolution homes at the index
-- **WHEN** the blade is raised and the holder presents a clean signature within 1.5 revolutions
-- **THEN** A home is set at the wide-chamfer peak and reported, with no more than one full revolution of scan
+- **WHEN** the blade is raised and the holder presents a clean signature within two revolutions
+- **THEN** A home is set at the North slot and reported, after disambiguating East/West chamfers by width
 
 #### Scenario: Signature absent (optics blocked)
-- **WHEN** reflectance never leaves the base band (35–43) after 1.5 revolutions of pulsing
+- **WHEN** reflectance never leaves the runtime-measured base band (no relative dip or rise) within two revolutions of pulsing
 - **THEN** homing aborts with an explicit error and A is de-energized
 
 ### Requirement: Thermal-safe pulse drive
-The homing sequence SHALL drive A only in discrete pulses (150–600 ms at speed 2000) separated by a cooldown of at least 1 s, so the A4950 never sustains PWM long enough to enter its thermal latch. The sequence SHALL abort if the A encoder stops advancing while the driver is commanded (frozen encoder = latch or jam).
+The homing sequence SHALL drive A only in discrete pulses (150–600 ms at a selectable PWM speed, OCxRS 2000–2400) separated by a cooldown of at least 1 s, so the A4950 never sustains PWM long enough to enter its thermal latch. The sequence SHALL abort if the A encoder stops advancing while the driver is commanded (frozen encoder = latch or jam).
 
 #### Scenario: Pulse width and cooldown enforced
 - **WHEN** homing drives A
