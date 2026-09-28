@@ -13,7 +13,10 @@
 #define A_HOME_PULSE_SPEED   2200
 #define A_HOME_COOLDOWN_MS   1000
 #define A_HOME_Z2_SETTLE_MS  1500
-#define A_HOME_Z2_RETRACT    400
+/* 1 mm = 800 steps: the verified no-rub clearance (session-4 + on-machine
+ * 2026-09-28: at 400/0.5 mm the blade scratched the frame and the A encoder
+ * froze across pulses -> A_HOME_ERR_LATCH on the first $HA attempt). */
+#define A_HOME_Z2_RETRACT    800
 #define A_HOME_PULSE_MS      150
 #define A_SCAN_MAX_STEPS     (27600 + 27600 / 2)
 #define A_SCAN_MAX_PULSES    40
@@ -91,8 +94,8 @@ uint8_t a_home_hal_run(void)
         printString("[AHOME:FAULT]\r\n");
         return STATUS_OK;
     }
-    /* Let the return spring rebound and settle FIRST, then retract ~0.5 mm
-     * so the chamfer sits flush with the sensor. */
+    /* Let the return spring rebound and settle FIRST, then retract ~1 mm
+     * so the blade clears the frame while the chamfer stays in view. */
     delay_ms(A_HOME_Z2_SETTLE_MS);
     z2_raise_steps(A_HOME_Z2_RETRACT);
 

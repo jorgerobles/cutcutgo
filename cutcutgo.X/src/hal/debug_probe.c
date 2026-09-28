@@ -421,6 +421,27 @@ static void dbg_sample(uint32_t n)
     printString("[DBG] samp done\r\n");
 }
 
+static void dbg_pwm_regs(void)
+{
+    printString("[PWMREGS] T2CON=");
+    print_hex8((T2CON >> 24) & 0xFF); print_hex8(T2CON & 0xFF);
+    printString(" PR2=");
+    print_hex8((PR2 >> 8) & 0xFF); print_hex8(PR2 & 0xFF);
+    printString(" OC4CON=");
+    print_hex8((OC4CON >> 8) & 0xFF); print_hex8(OC4CON & 0xFF);
+    printString(" OC4RS=");
+    print_hex8((OC4RS >> 8) & 0xFF); print_hex8(OC4RS & 0xFF);
+    printString(" RPD3R=");
+    print_hex8(RPD3R & 0xFF);
+    printString(" RPD11R=");
+    print_hex8(RPD11R & 0xFF);
+    printString(" TRISD=");
+    print_hex8((TRISD >> 8) & 0xFF); print_hex8(TRISD & 0xFF);
+    printString(" LATD=");
+    print_hex8((LATD >> 8) & 0xFF); print_hex8(LATD & 0xFF);
+    printString("\r\n");
+}
+
 static void dbg_motor(const char *name, hal_motor_driver_t *m, uint8_t ccw, uint32_t ms)
 {
     if (ms == 0 || ms > 2000)
@@ -433,6 +454,7 @@ static void dbg_motor(const char *name, hal_motor_driver_t *m, uint8_t ccw, uint
     printString("[DBG] motor ");
     printString(name);
     printString(" run\r\n");
+    dbg_pwm_regs();
     delay_ms(ms);
     hal_motor_set_direction(m, HAL_MOTOR_STOP);
     hal_motor_set_manual(m, false);
