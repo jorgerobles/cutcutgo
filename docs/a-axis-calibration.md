@@ -59,6 +59,18 @@ de `a-axis-homing-encoder.md` (17350) — ver sección "Correcciones".
   flag estático).
 - cooldown ≥1s entre pulsos largos; tandas cortas toleran pausas menores.
 
+## Emisor IR del sensor (SET IN STONE, hardware-verified)
+
+El emisor va **hardwired al rail** de alimentación: se enciende al enchufar
+el alimentador sin pasar por el micro (verificado con cámara+sketch vacío
+2026-09-28). No hay control programático del LED. Consecuencias:
+
+- Compensación de ambiente NO puede hacerse por apagado del emisor.
+- El pedestal ambiente se descuenta por software: umbral dinámico contra
+  la base medida en el propio seek, o referencia = suelo del perfil
+  (zona absorbedora).
+- Si el ambiente influye, defensa mecánica: apantallar la óptica.
+
 ## Pendiente (próxima sesión, máquina fría)
 
 1. Verificar estabilidad de la firma en frío vs caliente (dips presentes
