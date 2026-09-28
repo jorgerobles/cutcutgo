@@ -71,6 +71,17 @@ ifeq ($(BENCH),1)
   UF2       := $(DIST_DIR)/Cutcutgo_maker1_bootloader_app.uf2
 endif
 
+ifeq ($(EMPTY),1)
+  CFLAGS   += -DEMPTY_SPIKE
+  BUILD_DIR := build/$(CONF)-empty/production
+  DIST_DIR  := dist/$(CONF)-empty/production
+  ELF       := $(DIST_DIR)/cutcutgo.X.production.elf
+  HEX       := $(DIST_DIR)/cutcutgo.X.production.hex
+  MAP       := $(DIST_DIR)/cutcutgo.X.production.map
+  BIN       := $(DIST_DIR)/cutcutgo.X.production.bin
+  UF2       := $(DIST_DIR)/Cutcutgo_maker1_bootloader_app.uf2
+endif
+
 ifeq ($(SPIKE),1)
   CFLAGS   += -DMOTOR_SPIKE
   BUILD_DIR := build/$(CONF)-spike/production

@@ -439,7 +439,13 @@ void APP_Initialize(void)
 
     //serial_init();
     timer_init();
-#if defined(MOTOR_SPIKE)
+#if defined(EMPTY_SPIKE)
+    /* Empty firmware: no peripheral init, no motion, no serial.
+     * GPIOs stay at reset state (input/high-Z). Operator checks with a
+     * phone camera whether the mark-sensor IR emitter still glows:
+     * glowing = hardwired always-on, dark = controllable. */
+    (void)timer_init;
+#elif defined(MOTOR_SPIKE)
     serial_init();
     spike_init();
 #elif defined(SENSOR_BENCH)
@@ -475,7 +481,11 @@ void APP_Tasks(void)
 
     if (appData.grblInitialized)
     {
-#if defined(MOTOR_SPIKE)
+#if defined(EMPTY_SPIKE)
+        /* Empty: forever-loop, nothing else. */
+        for (;;)
+        { }
+#elif defined(MOTOR_SPIKE)
         /* Bare-metal motor spike: scripted jogs + telemetry, no GRBL. */
         spike_task();
 #elif defined(SENSOR_BENCH)
