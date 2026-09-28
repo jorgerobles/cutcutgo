@@ -79,8 +79,10 @@ void hal_motor_update_encoder_state(hal_motor_driver_t *motor, uint8_t enc_state
         case M_CW:
         case M_CCW:
         {
-            /* Increment number of steps done. */
-            if (direction == motor->direction)
+            /* Bidirectional position counter: M_CW = forward, M_CCW = backward.
+             * Compare against the fixed M_CW reference, NOT motor->direction
+             * (the current command), which would make the counter monotonic. */
+            if (direction == M_CW)
             {
                 if (motor->inv_encoder)
                     motor->current_steps--;
