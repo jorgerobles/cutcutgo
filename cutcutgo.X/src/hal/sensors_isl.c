@@ -209,8 +209,11 @@ static sensor_status_t isl_setup(void)
         return SENSOR_OK;
 
     i2c_recover();
+    /* CFG2 = 0x3F: active IR compensation ALSCC[5:0]=63, IRCOM bit7=0 (the Cricut
+     * variant NACKs bit7). With CFG2=0x00 the ambient IR leaks into GREEN and the
+     * reflectance base drifts 23↔115, washing out the slot/chamfer signature. */
     if (!isl_write_reg(ISL_REG_CFG1, 0x05) ||
-        !isl_write_reg(ISL_REG_CFG2, 0x00))
+        !isl_write_reg(ISL_REG_CFG2, 0x3F))
         return SENSOR_FAULT;
     if (!isl_read_reg(ISL_REG_CFG1, &v) || v != 0x05)
         return SENSOR_FAULT;
