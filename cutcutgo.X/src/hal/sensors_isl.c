@@ -17,7 +17,11 @@
 static void dly(void)
 {
     volatile int i;
-    for (i = 0; i < 2400; i++) { }
+    /* ~5 us per half-bit at 96 MHz -> ~100 kHz I2C (ISL29125 supports up to
+     * 400 kHz). The old 2400-iteration delay ran the bus at ~500 Hz, making
+     * every register read take ~10 ms and capping the reflectance sampling
+     * at ~30 Hz - the reason continuous rotation capture was useless. */
+    for (i = 0; i < 100; i++) { }
 }
 
 static void scl_hi(void)
@@ -261,6 +265,9 @@ sensor_status_t mark_detector_read(int32_t *value_q16)
 
     if (st != SENSOR_OK)
         return st;
+    /* The 0x09 read is REQUIRED before 0x0A: without it 0x0A returns a stale
+     * value (verified on hardware: pure0A=3, after09: 09=60 0A=167). The
+     * speedup comes from the ~100 kHz bus only (~1 ms per sample total). */
     if (!isl_read_reg(ISL_REG_CH_A - 1, &dummy))
         return SENSOR_TIMEOUT;
     if (!isl_read_reg(ISL_REG_CH_A, &v))
