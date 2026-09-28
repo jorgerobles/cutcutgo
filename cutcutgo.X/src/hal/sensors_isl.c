@@ -17,7 +17,12 @@
 static void dly(void)
 {
     volatile int i;
-    for (i = 0; i < 2400; i++) { }
+    /* ~5 us per half-bit at 96 MHz -> ~100 kHz I2C (ISL29125 tolerates up to
+     * 400 kHz). The old 2400-iteration delay ran the bus at ~500 Hz: every
+     * register read took ~20 ms and capped the refl sampling at ~30 Hz.
+     * On-machine 2026-09-28: reads now ~15 ms (sensor stretches SCL -- its
+     * own limit), enough for one settled sample per stop in stop-go sweeps. */
+    for (i = 0; i < 100; i++) { }
 }
 
 static void scl_hi(void)
